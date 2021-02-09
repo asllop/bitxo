@@ -1,8 +1,6 @@
 
 //dump(CommandLine.arguments)
 
-// TODO: variables
-
 class BXOObject {
     private static var next_object_id : Int64 = 1
 
@@ -56,6 +54,14 @@ class BXOSelector : BXOObject {
     }
 }
 
+class BXOVariable : BXOObject {
+    public var name : String
+
+    public init(_ name: String) {
+        self.name = name
+    }
+}
+
 class BXOList : BXOObject {
     public var list : [BXOObject]
     public let eval : Bool
@@ -77,10 +83,13 @@ func LOG(_ obj: BXOObject, _ level: Int = 0) {
         print("<String: ID = \(str.object_id), value = \(str.string)>")
     }
     else if let sym = obj as? BXOSymbol {
-        print("<Symbol: ID = \(sym.object_id), value = \(sym.symbol)>")
+        print("<Symbol: ID = \(sym.object_id), value = #\(sym.symbol)>")
     }
     else if let sel = obj as? BXOSelector {
         print("<Selector: ID = \(sel.object_id), object = \(BXOTYPE(sel.object)), function = \(sel.function)>")
+    }
+    else if let vari = obj as? BXOVariable {
+        print("<Variable: ID = \(vari.object_id), name = \(vari.name)>")
     }
     else if let lst = obj as? BXOList {
         print("<List: ID = \(lst.object_id), eval = \(lst.eval), value = [")
@@ -117,6 +126,9 @@ func BXOTYPE(_ obj: BXOObject) -> String {
     else if obj is BXOSelector {
         ret = "Selector"
     }
+    else if obj is BXOVariable {
+        ret = "Variable"
+    }
     else if obj is BXOList {
         ret = "List"
     }
@@ -127,8 +139,9 @@ func BXOTYPE(_ obj: BXOObject) -> String {
 }
 
 /*
-(1.1 "Hola amic" 99 #hola ["Hola ":+ "Andreu"])
+"The following code corresponds to the defined list structure below"
+(1.1 'Hola amic' 99 #hola ['Hola ':+ 'Andreu'] var)
 */
-let list = BXOList([BXOFloat(1.1), BXOString("Hola amic"), BXOInteger(99), BXOSymbol("#hola"), BXOList([BXOSelector(BXOString("Hola "), "+"), BXOString("Andreu")], false)])
+let list = BXOList([BXOFloat(1.1), BXOString("Hola amic"), BXOInteger(99), BXOSymbol("hola"), BXOList([BXOSelector(BXOString("Hola "), "+"), BXOString("Andreu")], false), BXOVariable("var")])
 
 LOG(list)
