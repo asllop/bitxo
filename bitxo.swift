@@ -3,14 +3,14 @@
 
 // TODO: variables
 
-var last_object_id : Int64 = 1
-
 class BXOObject {
+    private static var next_object_id : Int64 = 1
+
     public var object_id : Int64
 
     public init() {
-        self.object_id = last_object_id
-        last_object_id = last_object_id + 1
+        self.object_id = BXOObject.next_object_id
+        BXOObject.next_object_id = BXOObject.next_object_id + 1
     }
 }
 
