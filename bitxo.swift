@@ -39,6 +39,10 @@ class BXOInteger : BXOObject  {
 
         // Init native functions
         self.native_functions["+"] = self._plus_
+        self.native_functions["-"] = self._minus_
+        self.native_functions["*"] = self._multiply_
+        self.native_functions["/"] = self._divide_
+        self.native_functions["%"] = self._reminder_
     }
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
@@ -46,6 +50,46 @@ class BXOInteger : BXOObject  {
         for i in args {
             if let bxoInt = i as? BXOInteger {
                 res = res + bxoInt.integer
+            }
+        }
+        return BXOInteger(res)
+    }
+
+    public func _minus_(args: [BXOObject]) -> BXOObject {
+        var res : Int64 = self.integer
+        for i in args {
+            if let bxoInt = i as? BXOInteger {
+                res = res - bxoInt.integer
+            }
+        }
+        return BXOInteger(res)
+    }
+
+    public func _multiply_(args: [BXOObject]) -> BXOObject {
+        var res : Int64 = self.integer
+        for i in args {
+            if let bxoInt = i as? BXOInteger {
+                res = res * bxoInt.integer
+            }
+        }
+        return BXOInteger(res)
+    }
+
+    public func _divide_(args: [BXOObject]) -> BXOObject {
+        var res : Int64 = self.integer
+        for i in args {
+            if let bxoInt = i as? BXOInteger {
+                res = res / bxoInt.integer
+            }
+        }
+        return BXOInteger(res)
+    }
+
+    public func _reminder_(args: [BXOObject]) -> BXOObject {
+        var res : Int64 = self.integer
+        for i in args {
+            if let bxoInt = i as? BXOInteger {
+                res = res % bxoInt.integer
             }
         }
         return BXOInteger(res)
@@ -265,12 +309,11 @@ print()
 
 /*
 "The following code corresponds to the defined list structure below"
-(obj:foo 0 (1 2) (3 4 5))
+(1:* 1 (1 2) (3 4 5))
 */
-/*
 let list2 = BXOList([
-    BXOSelector(BXOVariable("obj"), "foo"),
-    BXOInteger(0),
+    BXOSelector(BXOInteger(1), "*"),
+    BXOInteger(1),
     BXOList([
         BXOInteger(1),
         BXOInteger(2)
@@ -285,4 +328,3 @@ let list2 = BXOList([
 LOG(list2)
 print("-----------------------------")
 eval(list: list2)
-*/
