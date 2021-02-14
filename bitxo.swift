@@ -23,10 +23,24 @@ class BXOObject : CustomStringConvertible {
     public init() {
         self.object_id = BXOObject.next_object_id
         BXOObject.next_object_id = BXOObject.next_object_id + 1
+
+        // Init native functions
+        self.native_functions["def"] = self._def_
     }
 
     var description: String {
         return "\(type(of: self))<\(self.object_id)>"
+    }
+
+    public func _def_(args: [BXOObject]) -> BXOObject {
+        if args.count == 2 {
+            if let symbol = args[1] as? BXOSymbol {
+                entity_table[symbol.symbol] = args[0]
+            }
+        }
+        //TODO: if arguments are not correct, throw exception
+        //TODO: native functions should be able to return nothing: Return BXOVoid?
+        return BXOVoid()
     }
 }
 
@@ -104,6 +118,8 @@ class BXOFloat : BXOObject {
     }
 }
 
+class BXOVoid : BXOObject {}
+
 class BXOString : BXOObject {
     public var string : String
 
@@ -169,7 +185,8 @@ func push(value: BXOObject) {
 func exec(stack: [BXOObject]) {
     if stack.count > 0 {
         if let sel = stack[0] as? BXOSelector {
-            print("Run selector \(sel)")
+            print("Run selector = ", terminator: "")
+            LOG(sel)
             if let function = sel.object.native_functions[sel.function] {
                 let res = function(Array(stack[1...]))
                 push(value: res)
@@ -309,7 +326,7 @@ print()
 
 /*
 "The following code corresponds to the defined list structure below"
-(1:* 1 (1 2) (3 4 5))
+(1:* 1 (1 2) (3 4 5) (obj:def [1 2 3] #foo))
 */
 let list2 = BXOList([
     BXOSelector(BXOInteger(1), "*"),
@@ -322,6 +339,15 @@ let list2 = BXOList([
         BXOInteger(3),
         BXOInteger(4),
         BXOInteger(5)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("obj"), "def"),
+        BXOList([
+            BXOInteger(1),
+            BXOInteger(2),
+            BXOInteger(3)
+        ], true),
+        BXOSymbol("foo")
     ])
 ])
 
