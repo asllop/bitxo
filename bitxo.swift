@@ -118,7 +118,8 @@ func exec(stack: [BXOObject]) {
         }
         else {
             print("No selector, return last element")
-            //TODO: oush last element to the current stack
+            //push last element to the current stack
+            push(value: stack[stack.count - 1])
         }
     }
 }
@@ -234,3 +235,29 @@ let list1 = BXOList([
 LOG(list1)
 print("-----------------------------")
 eval(list: list1)
+
+print()
+print("==============================")
+print()
+
+/*
+"The following code corresponds to the defined list structure below"
+(obj:foo 0 (1 2) (3 4 5))
+*/
+let list2 = BXOList([
+    BXOSelector(BXOVariable("obj"), "foo"),
+    BXOInteger(0),
+    BXOList([
+        BXOInteger(1),
+        BXOInteger(2)
+    ]),
+    BXOList([
+        BXOInteger(3),
+        BXOInteger(4),
+        BXOInteger(5)
+    ])
+])
+
+LOG(list2)
+print("-----------------------------")
+eval(list: list2)
