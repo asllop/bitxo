@@ -118,6 +118,14 @@ class BXOFloat : BXOObject {
     }
 }
 
+class BXOBoolean : BXOObject {
+    public var boolean : Bool
+
+    public init(_ boolean : Bool) {
+        self.boolean = boolean
+    }
+}
+
 class BXOVoid : BXOObject {}
 
 class BXOString : BXOObject {
