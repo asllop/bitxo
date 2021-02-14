@@ -81,11 +81,11 @@ class BXOVariable : BXOObject {
 
 class BXOList : BXOObject {
     public var list : [BXOObject]
-    public let eval : Bool
+    public let literal : Bool
 
-    public init(_ list : [BXOObject], _ eval : Bool = true) {
+    public init(_ list : [BXOObject], _ literal : Bool = false) {
         self.list = list
-        self.eval = eval
+        self.literal = literal
     }
 }
 
@@ -108,15 +108,17 @@ func push(value: BXOObject) {
 }
 
 func exec(stack: [BXOObject]) {
-    //TODO: execute this stack if there is a Selector in pos 0, and push the returned value to current stack
-    //TODO: how to run native vs defined selectors?
-    //TODO: if no selector, just return last value
     if stack.count > 0 {
         if let sel = stack[0] as? BXOSelector {
             print("Run selector \(sel)")
+            //TODO: check if selector references a native function or defined
+            //TODO: if native, execute
+            //TODO: if defined, then is a list, call eval
+            //TODO: push returned value to current stack
         }
         else {
             print("No selector, return last element")
+            //TODO: oush last element to the current stack
         }
     }
 }
@@ -124,7 +126,7 @@ func exec(stack: [BXOObject]) {
 func eval(list: BXOList) {
     addStack()
     for obj in list.list {
-        if let lst = obj as? BXOList {
+        if let lst = obj as? BXOList, lst.literal == false {
             eval(list: lst)
         }
         else {
@@ -159,7 +161,7 @@ func LOG(_ obj: BXOObject, _ level: Int = 0) {
         print("<Variable: ID = \(vari.object_id), name = \(vari.name)>")
     }
     else if let lst = obj as? BXOList {
-        print("<List: ID = \(lst.object_id), eval = \(lst.eval), list = [")
+        print("<List: ID = \(lst.object_id), eval = \(lst.literal), list = [")
         for content in lst.list {
             for _ in 0..<level+1 {
                 print("    ", terminator: "")
@@ -207,25 +209,9 @@ func BXOTYPE(_ obj: BXOObject) -> String {
 
 /*
 "The following code corresponds to the defined list structure below"
-(1.1 'Hola amic' 99 #hola ['Hola ':+ 'Andreu'] var)
+(obj:foo 15 (10:+ 1) (100:+ (5:+ 2)) ['Andreu' 0.9999])
 */
 let list1 = BXOList([
-    BXOFloat(1.1),
-    BXOString("Hola amic"),
-    BXOInteger(99),
-    BXOSymbol("hola"),
-    BXOList([
-        BXOSelector(BXOString("Hola "), "+"),
-        BXOString("Andreu")
-    ], false),
-    BXOVariable("var")
-])
-
-/*
-"The following code corresponds to the defined list structure below"
-(obj:foo 15 (10:+ 1) (100:+ (5:+ 2)))
-*/
-let list2 = BXOList([
     BXOSelector(BXOVariable("obj"), "foo"),
     BXOInteger(15),
     BXOList([
@@ -239,8 +225,12 @@ let list2 = BXOList([
             BXOInteger(2)
         ]),
     ]),
+    BXOList([
+        BXOString("Andreu"),
+        BXOFloat(0.9999)
+    ], true),
 ])
 
-LOG(list2)
+LOG(list1)
 print("-----------------------------")
-eval(list: list2)
+eval(list: list1)
