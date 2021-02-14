@@ -16,8 +16,9 @@ class BXOObject : CustomStringConvertible {
     private static var next_object_id : Int64 = 1
 
     public var object_id : Int64
+    public var native_functions : [String:([BXOObject]) -> BXOObject] = [:]
     public var entity_table : [String:BXOObject] = [:]
-    public weak var environment : BXOObject?
+    //public weak var environment : BXOObject?
 
     public init() {
         self.object_id = BXOObject.next_object_id
@@ -34,6 +35,20 @@ class BXOInteger : BXOObject  {
 
     public init(_ integer : Int64) {
         self.integer = integer
+        super.init()
+
+        // Init native functions
+        self.native_functions["+"] = self._plus_
+    }
+
+    public func _plus_(args: [BXOObject]) -> BXOObject {
+        var res : Int64 = self.integer
+        for i in args {
+            if let bxoInt = i as? BXOInteger {
+                res = res + bxoInt.integer
+            }
+        }
+        return BXOInteger(res)
     }
 }
 
@@ -111,10 +126,18 @@ func exec(stack: [BXOObject]) {
     if stack.count > 0 {
         if let sel = stack[0] as? BXOSelector {
             print("Run selector \(sel)")
-            //TODO: check if selector references a native function or defined
-            //TODO: if native, execute
-            //TODO: if defined, then is a list, call eval
-            //TODO: push returned value to current stack
+            if let function = sel.object.native_functions[sel.function] {
+                let res = function(Array(stack[1...]))
+                push(value: res)
+
+                print("REST = ", terminator: "")
+                LOG(res)
+            }
+            else {
+                print("TODO: NO NATIVE FUNCTION FOUND IN OBJECT, TRY DEFINED.")
+                //TODO: if defined, then is a list, call eval
+                //TODO: push returned value to current stack
+            }
         }
         else {
             print("No selector, return last element")
@@ -244,6 +267,7 @@ print()
 "The following code corresponds to the defined list structure below"
 (obj:foo 0 (1 2) (3 4 5))
 */
+/*
 let list2 = BXOList([
     BXOSelector(BXOVariable("obj"), "foo"),
     BXOInteger(0),
@@ -261,3 +285,4 @@ let list2 = BXOList([
 LOG(list2)
 print("-----------------------------")
 eval(list: list2)
+*/
