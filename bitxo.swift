@@ -34,12 +34,11 @@ class BXOObject : CustomStringConvertible {
 
     public func _def_(args: [BXOObject]) -> BXOObject {
         if args.count == 2 {
-            if let symbol = args[1] as? BXOSymbol {
-                entity_table[symbol.symbol] = args[0]
+            if let symbol = args[0] as? BXOSymbol {
+                entity_table[symbol.symbol] = args[1]
             }
         }
         //TODO: if arguments are not correct, throw exception
-        //TODO: native functions should be able to return nothing: Return BXOVoid?
         return BXOVoid()
     }
 }
@@ -197,7 +196,9 @@ func exec(stack: [BXOObject]) {
             LOG(sel)
             if let function = sel.object.native_functions[sel.function] {
                 let res = function(Array(stack[1...]))
-                push(value: res)
+                if !(res is BXOVoid) {
+                    push(value: res)
+                }
 
                 print("REST = ", terminator: "")
                 LOG(res)
@@ -224,6 +225,7 @@ func eval(list: BXOList) {
         }
         else {
             // Store object in current stack
+            //TODO: if obj is a BXOVariable, get variable content
             push(value: obj)
             print("Push = ", terminator: "")
             LOG(obj)
@@ -241,6 +243,9 @@ func LOG(_ obj: BXOObject, _ level: Int = 0) {
     else if let flt = obj as? BXOFloat {
         print("<Float: ID = \(flt.object_id), float = \(flt.float)>")
     }
+    else if let bol = obj as? BXOBoolean {
+        print("<Boolean: ID = \(bol.object_id), boolean = \(bol.boolean)>")
+    }
     else if let str = obj as? BXOString {
         print("<String: ID = \(str.object_id), string = \(str.string)>")
     }
@@ -252,6 +257,9 @@ func LOG(_ obj: BXOObject, _ level: Int = 0) {
     }
     else if let vari = obj as? BXOVariable {
         print("<Variable: ID = \(vari.object_id), name = \(vari.name)>")
+    }
+    else if obj is BXOVoid {
+        print("<Void>")
     }
     else if let lst = obj as? BXOList {
         print("<List: ID = \(lst.object_id), eval = \(lst.literal), list = [")
@@ -334,7 +342,7 @@ print()
 
 /*
 "The following code corresponds to the defined list structure below"
-(1:* 1 (1 2) (3 4 5) (obj:def [1 2 3] #foo))
+(1:* 1 (1 2) (3 4 5) (obj:def #arr [1 2 3 true]))
 */
 let list2 = BXOList([
     BXOSelector(BXOInteger(1), "*"),
@@ -350,12 +358,13 @@ let list2 = BXOList([
     ]),
     BXOList([
         BXOSelector(BXOVariable("obj"), "def"),
+        BXOSymbol("arr"),
         BXOList([
             BXOInteger(1),
             BXOInteger(2),
-            BXOInteger(3)
-        ], true),
-        BXOSymbol("foo")
+            BXOInteger(3),
+            BXOBoolean(true)
+        ], true)
     ])
 ])
 
