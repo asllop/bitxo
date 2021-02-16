@@ -18,7 +18,6 @@ class BXOObject : CustomStringConvertible {
     public var object_id : Int64
     public var native_functions : [String:([BXOObject]) -> BXOObject] = [:]
     public var entity_table : [String:BXOObject] = [:]
-    //public weak var environment : BXOObject?
 
     public init() {
         self.object_id = BXOObject.next_object_id
@@ -34,8 +33,14 @@ class BXOObject : CustomStringConvertible {
 
     public func _def_(args: [BXOObject]) -> BXOObject {
         if args.count == 2 {
+            print("Defined symbol:")
             if let symbol = args[0] as? BXOSymbol {
                 entity_table[symbol.symbol] = args[1]
+                print("    - entity_table = \(entity_table)")
+            }
+            if let lst = args[1] as? BXOList {
+                lst.self_object = self
+                print("    - self_object = \(lst.self_object)")
             }
         }
         //TODO: if arguments are not correct, throw exception
@@ -57,6 +62,9 @@ class BXOInteger : BXOObject  {
         self.native_functions["/"] = self._divide_
         self.native_functions["%"] = self._reminder_
     }
+
+    //TODO: if no BXOInteger arguments, throw exception
+    //TODO: make math functions operate with only one argument
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
         var res : Int64 = self.integer
@@ -164,6 +172,10 @@ class BXOVariable : BXOObject {
 class BXOList : BXOObject {
     public var list : [BXOObject]
     public let literal : Bool
+    // Object where the List resides (if it is a defined function)
+    public weak var self_object : BXOObject? = nil
+    // Local environment
+    public weak var this_env : BXOList? = nil
 
     public init(_ list : [BXOObject], _ literal : Bool = false) {
         self.list = list
@@ -189,7 +201,15 @@ func push(value: BXOObject) {
     }
 }
 
-func exec(stack: [BXOObject]) {
+func pop() {
+    if stacks.count > 0 {
+        if stacks[stacks.count - 1].count > 0 {
+            stacks[stacks.count - 1].removeLast()
+        }
+    }
+}
+
+func exec(stack: [BXOObject], list: BXOList) {
     if stack.count > 0 {
         if let sel = stack[0] as? BXOSelector {
             print("Run selector = ", terminator: "")
@@ -211,29 +231,94 @@ func exec(stack: [BXOObject]) {
         }
         else {
             print("No selector, return last element")
-            //push last element to the current stack
-            push(value: stack[stack.count - 1])
+            //Push last element to the current stack. Check if last element exist, stack may be empty if BXOVoid is returned
+            if stack.count > 0 {
+                push(value: stack[stack.count - 1])
+            }
         }
     }
 }
 
+func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
+    //TODO: get v.name from current environment, if not found go back, and back and back...
+    //      and finally the object (if any)
+    //TODO: if "this" return current list environment
+    //TODO; if "self" return current object
+
+    print("Search var name \(variable.name) in \(list)")
+
+    if variable.name == "this" {
+        print("This current list = \(list.this_env)")
+        if let this = list.this_env {
+            return this
+        }
+    }
+    else {
+        var currList : BXOList? = list.this_env
+        while currList != nil {
+            print("currList = \(currList)")
+            if let content = currList!.entity_table[variable.name] {
+                print("Found var \(variable.name) in list \(currList) value = \(content)")
+                return content
+            }
+            else {
+                currList = currList!.this_env
+            }
+        }
+    }
+    
+    return BXOVoid()
+}
+
+//TODO: support calling selectors on an evaluable list -> ((9:+ 1):print)
+//      this should first evaluate the list, and then call the function on the resulting object
+//      If updating the eval function is too complicated, we could just substitute the code
+//      on parse time and add an intermediate step:
+/*
+(
+    (this:def #tmp_var (9:+ 1))
+    (tmp_var:print)
+)
+*/
+
 func eval(list: BXOList) {
     addStack()
-    for obj in list.list {
+    for var obj in list.list {
         if let lst = obj as? BXOList, lst.literal == false {
+            lst.this_env = list
             eval(list: lst)
         }
         else {
+            // If selector with variable, get content and put in the selector
+            if var sel = obj as? BXOSelector, let v = sel.object as? BXOVariable {
+                let content = obtain(variable: v, list: list)
+                sel.object = content
+                obj = sel
+                print("SELECTOR WITH VARIABLE, content = \(content)")
+            }
+
             // Store object in current stack
-            //TODO: if obj is a BXOVariable, get variable content
-            push(value: obj)
-            print("Push = ", terminator: "")
-            LOG(obj)
+            if let v = obj as? BXOVariable {
+                let content = obtain(variable: v, list: list)
+                push(value: content)
+
+                print("IS A VARIABLE = ", terminator: "")
+                LOG(v)
+
+                print("Push = ", terminator: "")
+                LOG(content)
+            }
+            else {
+                push(value: obj)
+
+                print("Push = ", terminator: "")
+                LOG(obj)
+            }
         }
     }
     let lastStack = removeStack()
     print("Last Stack = \(lastStack)")
-    exec(stack: lastStack)
+    exec(stack: lastStack, list: list)
 }
 
 func LOG(_ obj: BXOObject, _ level: Int = 0) {
@@ -262,7 +347,7 @@ func LOG(_ obj: BXOObject, _ level: Int = 0) {
         print("<Void>")
     }
     else if let lst = obj as? BXOList {
-        print("<List: ID = \(lst.object_id), eval = \(lst.literal), list = [")
+        print("<List: ID = \(lst.object_id), literal = \(lst.literal), list = [")
         for content in lst.list {
             for _ in 0..<level+1 {
                 print("    ", terminator: "")
@@ -332,14 +417,6 @@ let list1 = BXOList([
     ], true),
 ])
 
-LOG(list1)
-print("-----------------------------")
-eval(list: list1)
-
-print()
-print("==============================")
-print()
-
 /*
 "The following code corresponds to the defined list structure below"
 (1:* 1 (1 2) (3 4 5) (obj:def #arr [1 2 3 true]))
@@ -368,6 +445,30 @@ let list2 = BXOList([
     ])
 ])
 
-LOG(list2)
+/*
+"The following code corresponds to the defined list structure below"
+((this:def #numA 10) ( (this:def #numB 20) (numA:+ numB) ) )
+*/
+let list3 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable("this"), "def"),
+        BXOSymbol("numA"),
+        BXOInteger(10)
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("this"), "def"),
+            BXOSymbol("numB"),
+            BXOInteger(20)
+        ]),
+        BXOList([
+            BXOSelector(BXOVariable("numA"), "+"),
+            BXOVariable("numB")
+        ])
+    ])
+])
+
+let program = list3
+LOG(program)
 print("-----------------------------")
-eval(list: list2)
+eval(list: program)
