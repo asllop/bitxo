@@ -1,4 +1,5 @@
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
+//TODO: Exceptions
 
 class BXOObject : CustomStringConvertible {
     private static var next_object_id : Int64 = 1
@@ -28,7 +29,6 @@ class BXOObject : CustomStringConvertible {
                 lst.self_object = self
             }
         }
-        //TODO: if arguments are not correct, throw exception
         return BXOVoid()
     }
 }
@@ -47,8 +47,6 @@ class BXOInteger : BXOObject  {
         self.native_functions["/"] = self._divide_
         self.native_functions["%"] = self._reminder_
     }
-
-    //TODO: if no BXOInteger arguments, throw exception?
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
         if args.count > 0, let i = args[0] as? BXOInteger {
@@ -131,10 +129,17 @@ class BXOSelector : BXOObject {
 }
 
 class BXOVariable : BXOObject {
+    public enum VarType: Int {
+        case ThisVar = 0
+        case SelfVar = 1
+        case NormalVar = 2
+    }
     public var name : String
+    public var type : VarType
 
-    public init(_ name: String) {
+    public init(_ name: String = "", type: VarType = VarType.NormalVar) {
         self.name = name
+        self.type = type
     }
 }
 
@@ -203,15 +208,16 @@ func exec(stack: [BXOObject], list: BXOList) {
 }
 
 func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
-    //TODO; if "self" return current "object"
-    //TODO: if variable not in local environment, find it inside "object"
-
-    if variable.name == "this" {
+    switch variable.type {
+    case .ThisVar:
         if let this = list.this_env {
             return this
         }
-    }
-    else {
+    case .SelfVar:
+        //TODO: if "self" return current "object"
+        return BXOVoid()
+    default:
+        //TODO: if variable not in local environment, find it inside "object"
         var currList : BXOList? = list.this_env
         while currList != nil {
             if let content = currList!.entity_table[variable.name] {
@@ -222,7 +228,7 @@ func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
             }
         }
     }
-    
+
     return BXOVoid()
 }
 
@@ -340,17 +346,28 @@ func BXOTYPE(_ obj: BXOObject) -> String {
 
 /*
 "The following code corresponds to the defined list structure below"
-((this:def #numA 10) ( (this:def #numB 20) (numA:+ numB) ) )
+(
+    (this:def #numA 10)
+
+    (
+        (this:def #numB 20)
+        (numA:+ numB) "Return 30"
+    )
+
+    "Here numB doesn't exist"
+    (numA:+ numB) "Call + with a Void argument"
+    (numB:+ numA) "Try to call + on a Void object"
+)
 */
 let list3 = BXOList([
     BXOList([
-        BXOSelector(BXOVariable("this"), "def"),
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
         BXOSymbol("numA"),
         BXOInteger(10)
     ]),
     BXOList([
         BXOList([
-            BXOSelector(BXOVariable("this"), "def"),
+            BXOSelector(BXOVariable(type: .ThisVar), "def"),
             BXOSymbol("numB"),
             BXOInteger(20)
         ]),
@@ -358,6 +375,14 @@ let list3 = BXOList([
             BXOSelector(BXOVariable("numA"), "+"),
             BXOVariable("numB")
         ])
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("numA"), "+"),
+        BXOVariable("numB")
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("numB"), "+"),
+        BXOVariable("numA")
     ])
 ])
 
