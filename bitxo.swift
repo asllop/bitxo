@@ -48,57 +48,41 @@ class BXOInteger : BXOObject  {
         self.native_functions["%"] = self._reminder_
     }
 
-    //TODO: if no BXOInteger arguments, throw exception
-    //TODO: make math functions operate with only one argument
+    //TODO: if no BXOInteger arguments, throw exception?
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
-        var res : Int64 = self.integer
-        for i in args {
-            if let bxoInt = i as? BXOInteger {
-                res = res + bxoInt.integer
-            }
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            return BXOInteger(self.integer + i.integer)
         }
-        return BXOInteger(res)
+        return BXOVoid()
     }
 
     public func _minus_(args: [BXOObject]) -> BXOObject {
-        var res : Int64 = self.integer
-        for i in args {
-            if let bxoInt = i as? BXOInteger {
-                res = res - bxoInt.integer
-            }
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            return BXOInteger(self.integer - i.integer)
         }
-        return BXOInteger(res)
+        return BXOVoid()
     }
 
     public func _multiply_(args: [BXOObject]) -> BXOObject {
-        var res : Int64 = self.integer
-        for i in args {
-            if let bxoInt = i as? BXOInteger {
-                res = res * bxoInt.integer
-            }
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            return BXOInteger(self.integer * i.integer)
         }
-        return BXOInteger(res)
+        return BXOVoid()
     }
 
     public func _divide_(args: [BXOObject]) -> BXOObject {
-        var res : Int64 = self.integer
-        for i in args {
-            if let bxoInt = i as? BXOInteger {
-                res = res / bxoInt.integer
-            }
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            return BXOInteger(self.integer / i.integer)
         }
-        return BXOInteger(res)
+        return BXOVoid()
     }
 
     public func _reminder_(args: [BXOObject]) -> BXOObject {
-        var res : Int64 = self.integer
-        for i in args {
-            if let bxoInt = i as? BXOInteger {
-                res = res % bxoInt.integer
-            }
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            return BXOInteger(self.integer % i.integer)
         }
-        return BXOInteger(res)
+        return BXOVoid()
     }
 }
 
@@ -200,7 +184,7 @@ func exec(stack: [BXOObject], list: BXOList) {
                 if !(res is BXOVoid) {
                     push(value: res)
                 }
-                print("Executed function \(sel.function) on \(sel.object) = ", terminator: "")
+                print("Executed function \(sel.function) on \(sel.object) , result = ", terminator: "")
                 LOG(res)
             }
             else {
