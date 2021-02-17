@@ -338,6 +338,12 @@ func BXOTYPE(_ obj: BXOObject) -> String {
     else if obj is BXOSymbol {
         ret = "Symbol"
     }
+    else if obj is BXOBoolean {
+        ret = "Boolean"
+    }
+    else if obj is BXOVoid {
+        ret = "Void"
+    }
     else if obj is BXOSelector {
         ret = "Selector"
     }
