@@ -46,6 +46,7 @@ class BXOInteger : BXOObject  {
         self.native_functions["*"] = self._multiply_
         self.native_functions["/"] = self._divide_
         self.native_functions["%"] = self._reminder_
+        self.native_functions["print"] = self._print_
     }
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
@@ -80,6 +81,11 @@ class BXOInteger : BXOObject  {
         if args.count > 0, let i = args[0] as? BXOInteger {
             return BXOInteger(self.integer % i.integer)
         }
+        return BXOVoid()
+    }
+
+    public func _print_(args: [BXOObject]) -> BXOObject {
+        print("PRINT >>>>>>>>>>> \(self.integer)")
         return BXOVoid()
     }
 }
@@ -247,8 +253,7 @@ func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
 
 //TODO: support calling selectors on an evaluable list -> ((9:+ 1):print)
 //      this should first evaluate the list, and then call the function on the resulting object
-//      If updating the eval function is too complicated, we could just substitute the code
-//      on parse time and add an intermediate step:
+//      We could just substitute the code on parse time and add an intermediate step:
 /*
 (
     (this:def #tmp_var (9:+ 1))
@@ -380,8 +385,8 @@ func BXOTYPE(_ obj: BXOObject) -> String {
         (self:+ myNum)  "Return 76"
         (myNum:- self)  "Return 56"
     ])
-    "TODO: print result of this list below. Call a selector over an evaluable list"
-    (numA:foo)
+    
+    ((numA:foo):print) "=> (this:def #_tmp0_ (numA:foo)) (_tmp0_:print)"
 )
 */
 let list3 = BXOList([
@@ -435,7 +440,14 @@ let list3 = BXOList([
         ], true)
     ]),
     BXOList([
-        BXOSelector(BXOVariable("numA"), "foo"),
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("_tmp0_"),
+        BXOList([
+            BXOSelector(BXOVariable("numA"), "foo"),
+        ])
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("_tmp0_"), "print")
     ])
 ])
 
