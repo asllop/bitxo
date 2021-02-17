@@ -193,9 +193,10 @@ func exec(stack: [BXOObject], list: BXOList) {
                 LOG(res)
             }
             else {
-                print("TODO: NO NATIVE FUNCTION FOUND IN OBJECT, TRY DEFINED.")
-                //TODO: if defined, then is a list, call eval
-                //TODO: push returned value to current stack
+                if let lst = sel.object.entity_table[sel.function] as? BXOList {
+                    print("Execute defined function = \(lst)")
+                    eval(list: lst)
+                }
             }
         }
         else {
@@ -214,18 +215,32 @@ func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
             return this
         }
     case .SelfVar:
-        //TODO: if "self" return current "object"
-        return BXOVoid()
+        var currList : BXOList? = list
+        while currList != nil {
+            if let s = currList!.self_object {
+                return s
+            }
+            else {
+                currList = currList!.this_env
+            }
+        }
     default:
-        //TODO: if variable not in local environment, find it inside "object"
+        var self_object : BXOObject? = nil
         var currList : BXOList? = list.this_env
         while currList != nil {
             if let content = currList!.entity_table[variable.name] {
                 return content
             }
             else {
+                self_object = currList!.self_object
                 currList = currList!.this_env
             }
+        }
+        // If variable not in local environment, find it inside "object"
+        if let s = self_object, let content = s.entity_table[variable.name] {
+            print("FOUND VARIABLE IN SELF = ", terminator: "")
+            LOG(content)
+            return content
         }
     }
 
@@ -355,8 +370,13 @@ func BXOTYPE(_ obj: BXOObject) -> String {
     )
 
     "Here numB doesn't exist"
-    (numA:+ numB) "Call + with a Void argument"
-    (numB:+ numA) "Try to call + on a Void object"
+    (numA:+ numB) "Call + with a Void argument -> this should fire Exception"
+    (numB:+ numA) "Try to call + on a Void object -> this should fire Exception"
+
+    "TODO: test object variables"
+    "Define inc function inside numA"
+    (numA:def #inc [self:+ 1])
+    (numA:inc)
 )
 */
 let list3 = BXOList([
@@ -376,6 +396,7 @@ let list3 = BXOList([
             BXOVariable("numB")
         ])
     ]),
+    /*
     BXOList([
         BXOSelector(BXOVariable("numA"), "+"),
         BXOVariable("numB")
@@ -383,6 +404,15 @@ let list3 = BXOList([
     BXOList([
         BXOSelector(BXOVariable("numB"), "+"),
         BXOVariable("numA")
+    ]),
+    */
+    BXOList([
+        BXOSelector(BXOVariable("numA"), "def"),
+        BXOSymbol("inc"),
+        BXOList([BXOSelector(BXOVariable(type: .SelfVar), "+"), BXOInteger(1)], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("numA"), "inc"),
     ])
 ])
 
