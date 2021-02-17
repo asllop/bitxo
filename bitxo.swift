@@ -238,8 +238,6 @@ func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
         }
         // If variable not in local environment, find it inside "object"
         if let s = self_object, let content = s.entity_table[variable.name] {
-            print("FOUND VARIABLE IN SELF = ", terminator: "")
-            LOG(content)
             return content
         }
     }
@@ -370,13 +368,18 @@ func BXOTYPE(_ obj: BXOObject) -> String {
     )
 
     "Here numB doesn't exist"
-    (numA:+ numB) "Call + with a Void argument -> this should fire Exception"
-    (numB:+ numA) "Try to call + on a Void object -> this should fire Exception"
+    "(numA:+ numB)" "Call + with a Void argument -> this should fire Exception"
+    "(numB:+ numA)" "Try to call + on a Void object -> this should fire Exception"
 
-    "TODO: test object variables"
     "Define inc function inside numA"
-    (numA:def #inc [self:+ 1])
-    (numA:inc)
+    (numA:def #myNum 66)
+    (numA:def #foo [
+        (self:+ 1)
+        (self:+ myNum)
+        (myNum:- self)
+    ])
+    "TODO: print result of this list below. Call a selector over an evaluable list"
+    (numA:foo)
 )
 */
 let list3 = BXOList([
@@ -408,11 +411,29 @@ let list3 = BXOList([
     */
     BXOList([
         BXOSelector(BXOVariable("numA"), "def"),
-        BXOSymbol("inc"),
-        BXOList([BXOSelector(BXOVariable(type: .SelfVar), "+"), BXOInteger(1)], true)
+        BXOSymbol("myNum"),
+        BXOInteger(66)
     ]),
     BXOList([
-        BXOSelector(BXOVariable("numA"), "inc"),
+        BXOSelector(BXOVariable("numA"), "def"),
+        BXOSymbol("foo"),
+        BXOList([
+            BXOList([
+                BXOSelector(BXOVariable(type: .SelfVar), "+"),
+                BXOInteger(1)                
+            ]),
+            BXOList([
+                BXOSelector(BXOVariable(type: .SelfVar), "+"),
+                BXOVariable("myNum")
+            ]),
+            BXOList([
+                BXOSelector(BXOVariable("myNum"), "-"),
+                BXOVariable(type: .SelfVar)
+            ])
+        ], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("numA"), "foo"),
     ])
 ])
 
