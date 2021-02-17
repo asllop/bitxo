@@ -258,7 +258,7 @@ func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
 
 func eval(list: BXOList) {
     pushStack()
-    for var obj in list.list {
+    for obj in list.list {
         if let lst = obj as? BXOList, lst.literal == false {
             // Next object is an evaluable list, assign env and call eval with new list
             lst.this_env = list
@@ -267,22 +267,18 @@ func eval(list: BXOList) {
         else {
             // If selector with variable, get content and put in the selector
             if let sel = obj as? BXOSelector, let v = sel.object as? BXOVariable {
-                let content = obtain(variable: v, list: list)
-                sel.object = content
-                obj = sel
+                sel.object = obtain(variable: v, list: list)
             }
             // Store object in current stack
             if let v = obj as? BXOVariable {
-                let content = obtain(variable: v, list: list)
-                push(value: content)
+                push(value: obtain(variable: v, list: list))
             }
             else {
                 push(value: obj)
             }
         }
     }
-    let lastStack = popStack()
-    exec(stack: lastStack, list: list)
+    exec(stack: popStack(), list: list)
 }
 
 func LOG(_ obj: BXOObject, _ level: Int = 0) {
@@ -374,9 +370,9 @@ func BXOTYPE(_ obj: BXOObject) -> String {
     "Define inc function inside numA"
     (numA:def #myNum 66)
     (numA:def #foo [
-        (self:+ 1)
-        (self:+ myNum)
-        (myNum:- self)
+        (self:+ 1)      "Return 1"
+        (self:+ myNum)  "Return 76"
+        (myNum:- self)  "Return 56"
     ])
     "TODO: print result of this list below. Call a selector over an evaluable list"
     (numA:foo)
