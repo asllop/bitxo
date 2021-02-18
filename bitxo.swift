@@ -1,3 +1,6 @@
+//TODO: "def" in basic types: Object, Integer, Float, String, Boolean, Symbol, List.
+//      create a static entity_table (type_entity_table) for each class, that will hold type level defs.
+//TODO: create instances, copy of an class/object
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
 
@@ -127,10 +130,12 @@ class BXOSymbol : BXOObject {
 class BXOSelector : BXOObject {
     public var function : String
     public var object : BXOObject
+    public var pop_object : Bool
 
-    public init(_ object: BXOObject, _ function: String) {
+    public init(_ object: BXOObject, _ function: String, _ pop_object : Bool = false) {
         self.object = object
         self.function = function
+        self.pop_object = pop_object
     }
 }
 
@@ -206,8 +211,15 @@ func exec(stack: [BXOObject], list: BXOList) {
             }
         }
         else {
-            //Push last element to the current stack. Check if last element exist, stack may be empty if BXOVoid is returned
-            if stack.count > 0 {
+            if stack.count > 1, let sel = stack[1] as? BXOSelector, sel.pop_object == true {
+                print("Exec selector with pop_object \(sel) = \(stack)")
+                // Pop stack[0], set it into selector object and call exec with modified stack
+                var s = stack
+                sel.object = s.remove(at: 0)
+                exec(stack: s, list: list)
+            }
+            else {
+                //Push last element to the current stack. Check if last element exist, stack may be empty if BXOVoid is returned
                 push(value: stack[stack.count - 1])
             }
         }
@@ -250,16 +262,6 @@ func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
 
     return BXOVoid()
 }
-
-//TODO: support calling selectors on an evaluable list -> ((9:+ 1):print)
-//      this should first evaluate the list, and then call the function on the resulting object
-//      We could just substitute the code on parse time and add an intermediate step:
-/*
-(
-    (this:def #tmp_var (9:+ 1))
-    (tmp_var:print)
-)
-*/
 
 func eval(list: BXOList) {
     pushStack()
@@ -385,8 +387,8 @@ func BXOTYPE(_ obj: BXOObject) -> String {
         (self:+ myNum)  "Return 76"
         (myNum:- self)  "Return 56"
     ])
-    
-    ((numA:foo):print) "=> (this:def #_tmp0_ (numA:foo)) (_tmp0_:print)"
+
+    ((numA:foo):print)
 )
 */
 let list3 = BXOList([
@@ -440,14 +442,10 @@ let list3 = BXOList([
         ], true)
     ]),
     BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("_tmp0_"),
         BXOList([
             BXOSelector(BXOVariable("numA"), "foo"),
-        ])
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("_tmp0_"), "print")
+        ]),
+        BXOSelector(BXOVoid(), "print", true),
     ])
 ])
 
