@@ -106,6 +106,30 @@ class BXOBoolean : BXOObject {
 
     public init(_ boolean : Bool) {
         self.boolean = boolean
+        super.init()
+
+        // Init native functions
+        self.native_functions["and"] = self._and_
+        self.native_functions["or"] = self._or_
+        self.native_functions["not"] = self._not_
+    }
+
+    public func _and_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let b = args[0] as? BXOBoolean {
+            return BXOBoolean(self.boolean && b.boolean)
+        }
+        return BXOVoid()
+    }
+
+    public func _or_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let b = args[0] as? BXOBoolean {
+            return BXOBoolean(self.boolean || b.boolean)
+        }
+        return BXOVoid()
+    }
+
+    public func _not_(args: [BXOObject]) -> BXOObject {
+        return BXOBoolean(!self.boolean)
     }
 }
 
