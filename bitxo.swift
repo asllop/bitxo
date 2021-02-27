@@ -196,7 +196,12 @@ class BXOString : BXOObject {
         super.init()
 
         // Init native functions
+        self.native_functions["sym"] = self._sym_
         self.native_functions["print"] = self._print_
+    }
+
+    public func _sym_(args: [BXOObject]) -> BXOObject {
+        return BXOSymbol(self.string)
     }
 
     public func _print_(args: [BXOObject]) -> BXOObject {
