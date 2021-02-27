@@ -49,6 +49,9 @@ class BXOInteger : BXOObject  {
         self.native_functions["*"] = self._multiply_
         self.native_functions["/"] = self._divide_
         self.native_functions["%"] = self._reminder_
+        self.native_functions["="] = self._equal_
+        self.native_functions["<"] = self._smaller_
+        self.native_functions["set"] = self._set_
         self.native_functions["print"] = self._print_
     }
 
@@ -83,6 +86,27 @@ class BXOInteger : BXOObject  {
     public func _reminder_(args: [BXOObject]) -> BXOObject {
         if args.count > 0, let i = args[0] as? BXOInteger {
             return BXOInteger(self.integer % i.integer)
+        }
+        return BXOVoid()
+    }
+
+    public func _equal_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            return BXOBoolean(self.integer == i.integer)
+        }
+        return BXOVoid()
+    }
+
+    public func _smaller_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            return BXOBoolean(self.integer < i.integer)
+        }
+        return BXOVoid()
+    }
+
+    public func _set_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let i = args[0] as? BXOInteger {
+            self.integer = i.integer
         }
         return BXOVoid()
     }
@@ -189,6 +213,39 @@ class BXOList : BXOObject {
     public init(_ list : [BXOObject], _ literal : Bool = false) {
         self.list = list
         self.literal = literal
+        super.init()
+
+        // Init native functions
+        self.native_functions["while"] = self._while_
+    }
+
+    public func _while_(args: [BXOObject]) -> BXOObject {
+        var do_loop = true
+
+        while do_loop {
+            // Eval condition
+            eval(list: self)
+            if let b = pop() as? BXOBoolean {
+                do_loop = b.boolean
+            }
+            else {
+                //TODO: exception
+                do_loop = false
+            }
+
+            if do_loop {
+                if let l = args[0] as? BXOList {
+                    // Run loop body
+                    l.this_env = this_env
+                    eval(list: l)
+                }
+                else {
+                    //TODO: exception
+                }
+            }
+        }
+
+        return BXOVoid()
     }
 }
 
@@ -208,18 +265,26 @@ func push(value: BXOObject) {
     }
 }
 
-func pop() {
+func pop() -> BXOObject? {
     if stacks.count > 0 {
         if stacks[stacks.count - 1].count > 0 {
-            stacks[stacks.count - 1].removeLast()
+            return stacks[stacks.count - 1].removeLast()
         }
     }
+    return nil
 }
 
 func exec(stack: [BXOObject], list: BXOList) {
     if stack.count > 0 {
         if let sel = stack[0] as? BXOSelector {
+            // If object of selector is a list, set this_env
+            if let lst_obj = sel.object as? BXOList {
+                print("Object of selector is a list, set this_env")
+                lst_obj.this_env = list
+            }
+
             if let function = sel.object.native_functions[sel.function] {
+                // Execute native function
                 let res = function(Array(stack[1...]))
                 if !(res is BXOVoid) {
                     push(value: res)
@@ -228,6 +293,7 @@ func exec(stack: [BXOObject], list: BXOList) {
                 LOG(res)
             }
             else {
+                // Execute defined function
                 if let lst = sel.object.entity_table[sel.function] as? BXOList {
                     print("Execute defined function = \(lst)")
                     eval(list: lst)
@@ -268,7 +334,7 @@ func obtain(variable: BXOVariable, list: BXOList) -> BXOObject {
         }
     default:
         var self_object : BXOObject? = nil
-        var currList : BXOList? = list.this_env
+        var currList : BXOList? = list//.this_env
         while currList != nil {
             if let content = currList!.entity_table[variable.name] {
                 return content
@@ -415,7 +481,7 @@ func BXOTYPE(_ obj: BXOObject) -> String {
     ((numA:foo):print)
 )
 */
-let list3 = BXOList([
+let list1 = BXOList([
     BXOList([
         BXOSelector(BXOVariable(type: .ThisVar), "def"),
         BXOSymbol("numA"),
@@ -473,7 +539,58 @@ let list3 = BXOList([
     ])
 ])
 
-let program = list3
+/*
+(
+    (this:def #counter 0)
+    (
+        [counter:< 10]:while [
+            (counter:set (counter:+ 1))
+            (counter:print)
+        ]
+    )
+)
+
+Inside the loop block we cannot define counter again, because it will be defines inside the List of the block,
+and the definition will not be accessible from other blocks (condition).
+
+Instead, we use "set" to change value.
+
+To resolve this problem we could create a selector that returns the local environment of any object.
+
+    (counter:this)
+
+So we can do:
+    
+    ((counter:this):def #counter (counter:+ 1))
+*/
+
+let list2 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("counter"),
+        BXOInteger(0)
+    ]),
+    BXOList([
+        BXOSelector(BXOList([
+            BXOSelector(BXOVariable("counter"), "<"),
+            BXOInteger(10)
+        ], true), "while"),
+        BXOList([
+            BXOList([
+                BXOSelector(BXOVariable("counter"), "print")
+            ]),
+            BXOList([
+                BXOSelector(BXOVariable("counter"), "set"),
+                BXOList([
+                    BXOSelector(BXOVariable("counter"), "+"),
+                    BXOInteger(1)
+                ])
+            ])
+        ], true)
+    ])
+])
+
+let program = list2
 LOG(program)
 print("-----------------------------")
 eval(list: program)
