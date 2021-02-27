@@ -3,6 +3,9 @@
 //TODO: create instances, copy of an class/object
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
+//TODO: Implement BXOObject:this to get current this_env of any object.
+
+import Foundation
 
 class BXOObject : CustomStringConvertible {
     private static var next_object_id : Int64 = 1
@@ -52,6 +55,10 @@ class BXOInteger : BXOObject  {
         self.native_functions["="] = self._equal_
         self.native_functions["<"] = self._smaller_
         self.native_functions["set"] = self._set_
+        self.native_functions["str"] = self._str_
+        self.native_functions["float"] = self._float_
+
+        //TESTING: should be defined in bitxo -> (Integer:def #print [(self:str):print])
         self.native_functions["print"] = self._print_
     }
 
@@ -111,6 +118,15 @@ class BXOInteger : BXOObject  {
         return BXOVoid()
     }
 
+    public func _str_(args: [BXOObject]) -> BXOObject {
+        return BXOString("\(self.integer)")
+    }
+
+    public func _float_(args: [BXOObject]) -> BXOObject {
+        return BXOFloat(Double(self.integer))
+    }
+
+    //TESTING
     public func _print_(args: [BXOObject]) -> BXOObject {
         print("PRINT >>>>>>>>>>> \(self.integer)")
         return BXOVoid()
@@ -122,6 +138,21 @@ class BXOFloat : BXOObject {
 
     public init(_ float : Double) {
         self.float = float
+        super.init()
+
+        // Init native functions
+        self.native_functions["str"] = self._str_
+    }
+
+    public func _str_(args: [BXOObject]) -> BXOObject {
+        // Optional argument, format, using printf %f syntax.
+        if args.indices.contains(0), let format = args[0] as? BXOString {
+            let s = NSString(format: format.string as NSString, self.float)
+            return BXOString(s as String)
+        }
+        else {
+            return BXOString("\(self.float)")
+        }
     }
 }
 
@@ -157,8 +188,6 @@ class BXOBoolean : BXOObject {
     }
 }
 
-class BXOVoid : BXOObject {}
-
 class BXOString : BXOObject {
     public var string : String
 
@@ -171,7 +200,7 @@ class BXOString : BXOObject {
     }
 
     public func _print_(args: [BXOObject]) -> BXOObject {
-        print("PRINT >>>>>>>>>>> \(self.string)")
+        print("\(self.string)")
         return BXOVoid()
     }
 }
@@ -181,6 +210,14 @@ class BXOSymbol : BXOObject {
 
     public init(_ symbol : String) {
         self.symbol = symbol
+        super.init()
+
+        // Init native functions
+        self.native_functions["str"] = self._str_
+    }
+
+    public func _str_(args: [BXOObject]) -> BXOObject {
+        return BXOString(self.symbol)
     }
 }
 
@@ -210,6 +247,8 @@ class BXOVariable : BXOObject {
         self.type = type
     }
 }
+
+class BXOVoid : BXOObject {}
 
 class BXOList : BXOObject {
     public var list : [BXOObject]
@@ -248,7 +287,7 @@ class BXOList : BXOObject {
             print("EXCEPTION")
         }
 
-        if let if_l = args[0] as? BXOList, let else_l = args[1] as? BXOList {
+        if args.count >= 2, let if_l = args[0] as? BXOList, let else_l = args[1] as? BXOList {
             if cond {
                 if_l.this_env = this_env
                 eval(list: if_l)
@@ -280,7 +319,7 @@ class BXOList : BXOObject {
             }
 
             if do_loop {
-                if let l = args[0] as? BXOList {
+                if args.count >= 1, let l = args[0] as? BXOList {
                     // Run loop body
                     l.this_env = this_env
                     eval(list: l)
@@ -692,7 +731,88 @@ let list3 = BXOList([
     ])
 ])
 
-let program = list3
+/*
+(this:def #inum 10)
+(this:def #fnum 9.9)
+(this:def #symb #hola)
+
+((inum:str):print)
+((fnum:str):print)
+((fnum:str "%.3f"):print)
+((symb:str):print)
+*/
+
+let list4 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("inum"),
+        BXOInteger(10)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("fnum"),
+        BXOFloat(9.9)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("symb"),
+        BXOSymbol("hola")
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("inum"), "str"),
+        ]),
+        BXOSelector(BXOVoid(), "print", true),
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("fnum"), "str"),
+        ]),
+        BXOSelector(BXOVoid(), "print", true),
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("fnum"), "str"),
+            BXOString("%.3f")
+        ]),
+        BXOSelector(BXOVoid(), "print", true),
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("symb"), "str"),
+        ]),
+        BXOSelector(BXOVoid(), "print", true),
+    ])
+])
+
+/*
+(this:def #inum 10)
+((((inum:+ 1):* 2):str):print)
+*/
+
+let list5 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("inum"),
+        BXOInteger(10)
+    ]),
+    BXOList([
+        BXOList([
+            BXOList([
+                BXOList([
+                    BXOSelector(BXOVariable("inum"), "+"),
+                    BXOInteger(1)
+                ]),
+                BXOSelector(BXOVoid(), "*", true),
+                BXOInteger(2)
+            ]),
+            BXOSelector(BXOVoid(), "str", true)
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ])
+])
+
+let program = list4
 LOG(program)
 print("-----------------------------")
 eval(list: program)
