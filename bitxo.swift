@@ -164,6 +164,15 @@ class BXOString : BXOObject {
 
         public init(_ string : String) {
         self.string = string
+        super.init()
+
+        // Init native functions
+        self.native_functions["print"] = self._print_
+    }
+
+    public func _print_(args: [BXOObject]) -> BXOObject {
+        print("PRINT >>>>>>>>>>> \(self.string)")
+        return BXOVoid()
     }
 }
 
@@ -216,12 +225,49 @@ class BXOList : BXOObject {
         super.init()
 
         // Init native functions
+        self.native_functions["if"] = self._if_
+        self.native_functions["if-else"] = self._ifelse_
         self.native_functions["while"] = self._while_
+    }
+
+    public func _if_(args: [BXOObject]) -> BXOObject {
+        var newargs = args
+        newargs.append(BXOList([]))
+        return _ifelse_(args: newargs)
+    }
+
+    public func _ifelse_(args: [BXOObject]) -> BXOObject {
+        var cond = true
+        // Eval condition
+        eval(list: self)
+        if let b = pop() as? BXOBoolean {
+            cond = b.boolean
+        }
+        else {
+            //TODO: exception
+            print("EXCEPTION")
+        }
+
+        if let if_l = args[0] as? BXOList, let else_l = args[1] as? BXOList {
+            if cond {
+                if_l.this_env = this_env
+                eval(list: if_l)
+            }
+            else {
+                else_l.this_env = this_env
+                eval(list: else_l)
+            }
+        }
+        else {
+            //TODO: exception
+            print("EXCEPTION")
+        }
+
+        return BXOVoid()
     }
 
     public func _while_(args: [BXOObject]) -> BXOObject {
         var do_loop = true
-
         while do_loop {
             // Eval condition
             eval(list: self)
@@ -230,7 +276,7 @@ class BXOList : BXOObject {
             }
             else {
                 //TODO: exception
-                do_loop = false
+                print("EXCEPTION")
             }
 
             if do_loop {
@@ -241,6 +287,7 @@ class BXOList : BXOObject {
                 }
                 else {
                     //TODO: exception
+                    print("EXCEPTION")
                 }
             }
         }
@@ -590,7 +637,62 @@ let list2 = BXOList([
     ])
 ])
 
-let program = list2
+/*
+(
+    (this:def #counter 0)
+    (
+        [counter:< 10]:if [
+            ("Counter menor que 10":print)
+        ]
+    )
+    (
+        [counter:= 10]:if-else
+        [
+            ("Counter igual a 10":print)
+        ]
+        [
+            ("Counter diferent de 10":print)
+        ]
+    )
+)
+*/
+
+let list3 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("counter"),
+        BXOInteger(0)
+    ]),
+    BXOList([
+        BXOSelector(BXOList([
+            BXOSelector(BXOVariable("counter"), "<"),
+            BXOInteger(10)
+        ], true), "if"),
+        BXOList([
+            BXOList([
+                BXOSelector(BXOString("Counter menor que 10"), "print")
+            ])
+        ], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOList([
+            BXOSelector(BXOVariable("counter"), "="),
+            BXOInteger(10)
+        ], true), "if-else"),
+        BXOList([
+            BXOList([
+                BXOSelector(BXOString("ounter igual a 10"), "print")
+            ])
+        ], true),
+        BXOList([
+            BXOList([
+                BXOSelector(BXOString("Counter diferent de 10"), "print")
+            ])
+        ], true)
+    ])
+])
+
+let program = list3
 LOG(program)
 print("-----------------------------")
 eval(list: program)
