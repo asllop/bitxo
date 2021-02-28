@@ -5,6 +5,7 @@
 //TODO: Exceptions
 //TODO: Implement method to get current this_env of any object.
 //TODO: get arguments in defined functions
+//TODO: check the type of an object
 
 import Foundation
 
@@ -21,6 +22,7 @@ class BXOObject : CustomStringConvertible {
 
         // Init native functions
         self.native_functions["def"] = self._def_
+        self.native_functions["key"] = self._key_
     }
 
     var description: String {
@@ -28,12 +30,23 @@ class BXOObject : CustomStringConvertible {
     }
 
     public func _def_(args: [BXOObject]) -> BXOObject {
-        if args.count == 2 {
+        if args.count > 1 {
             if let symbol = args[0] as? BXOSymbol {
                 entity_table[symbol.symbol] = args[1]
             }
             if let lst = args[1] as? BXOList {
                 lst.self_object = self
+            }
+        }
+        return BXOVoid()
+    }
+
+    public func _key_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0 {
+            if let sym = args[0] as? BXOSymbol {
+                if let entity = self.entity_table[sym.symbol] {
+                    return entity
+                }
             }
         }
         return BXOVoid()
@@ -932,6 +945,7 @@ let list6 = BXOList([
 
 ((dict:age):print)
 ((dict:name):print)
+((dict:key #name):print)
 */
 
 let list7 = BXOList([
@@ -959,6 +973,13 @@ let list7 = BXOList([
     BXOList([
         BXOList([
             BXOSelector(BXOVariable("dict"), "name")
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("dict"), "key"),
+            BXOSymbol("name")
         ]),
         BXOSelector(BXOVoid(), "print", true)
     ])
