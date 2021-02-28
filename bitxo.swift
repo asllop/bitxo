@@ -4,7 +4,6 @@
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
 //TODO: Implement method to get current this_env of any object.
-//TODO: Implement dictionaries: obtain object defined with "def".
 //TODO: get arguments in defined functions
 
 import Foundation
@@ -425,10 +424,16 @@ func exec(stack: [BXOObject], list: BXOList) {
                 LOG(res)
             }
             else {
-                // Execute defined function
-                if let lst = sel.object.entity_table[sel.function] as? BXOList {
-                    print("Execute defined function = \(lst)")
-                    eval(list: lst)
+                if let entity = sel.object.entity_table[sel.function] {  
+                    if let lst = entity as? BXOList {
+                        // Execute defined function
+                        print("Execute defined function = \(lst)")
+                        eval(list: lst)
+                    }
+                    else {
+                        // If not a list, return the value (put in stack)
+                        push(value: entity)
+                    }
                 }
             }
         }
@@ -919,7 +924,47 @@ let list6 = BXOList([
     ])
 ])
 
-let program = list6
+/*
+(this:def #dict [])
+
+(dict:def #age 37)
+(dict:def #name 'Andreu')
+
+((dict:age):print)
+((dict:name):print)
+*/
+
+let list7 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("dict"),
+        BXOList([], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("dict"), "def"),
+        BXOSymbol("age"),
+        BXOInteger(37)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("dict"), "def"),
+        BXOSymbol("name"),
+        BXOString("Andreu")
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("dict"), "age")
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("dict"), "name")
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ])
+])
+
+let program = list7
 LOG(program)
 print("-----------------------------")
 eval(list: program)
