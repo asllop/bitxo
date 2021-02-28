@@ -3,7 +3,9 @@
 //TODO: create instances, copy of an class/object
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
-//TODO: Implement BXOObject:this to get current this_env of any object.
+//TODO: Implement method to get current this_env of any object.
+//TODO: Implement dictionaries: obtain object defined with "def".
+//TODO: get arguments in defined functions
 
 import Foundation
 
@@ -272,6 +274,11 @@ class BXOList : BXOObject {
         self.native_functions["if"] = self._if_
         self.native_functions["if-else"] = self._ifelse_
         self.native_functions["while"] = self._while_
+        self.native_functions["at"] = self._at_
+        self.native_functions["put"] = self._put_
+        self.native_functions["add"] = self._add_
+        self.native_functions["rem"] = self._rem_
+        self.native_functions["size"] = self._size_
     }
 
     public func _if_(args: [BXOObject]) -> BXOObject {
@@ -288,8 +295,7 @@ class BXOList : BXOObject {
             cond = b.boolean
         }
         else {
-            //TODO: exception
-            print("EXCEPTION")
+            return BXOVoid() //TODO: exception
         }
 
         if args.count >= 2, let if_l = args[0] as? BXOList, let else_l = args[1] as? BXOList {
@@ -303,8 +309,7 @@ class BXOList : BXOObject {
             }
         }
         else {
-            //TODO: exception
-            print("EXCEPTION")
+            return BXOVoid() //TODO: exception
         }
 
         return BXOVoid()
@@ -319,8 +324,7 @@ class BXOList : BXOObject {
                 do_loop = b.boolean
             }
             else {
-                //TODO: exception
-                print("EXCEPTION")
+                return BXOVoid() //TODO: exception
             }
 
             if do_loop {
@@ -330,13 +334,50 @@ class BXOList : BXOObject {
                     eval(list: l)
                 }
                 else {
-                    //TODO: exception
-                    print("EXCEPTION")
+                    return BXOVoid() //TODO: exception
                 }
             }
         }
 
         return BXOVoid()
+    }
+
+    public func _at_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let index = args[0] as? BXOInteger {
+            if list.count > index.integer {
+                return list[Int(index.integer)]
+            }
+        }
+        return BXOVoid() //TODO: exception
+    }
+
+    public func _put_(args: [BXOObject]) -> BXOObject {
+        if args.count > 1, let index = args[0] as? BXOInteger {
+            if list.count > index.integer {
+                list[Int(index.integer)] = args[1]
+            }
+        }
+        return BXOVoid()
+    }
+
+    public func _add_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0 {
+            list.append(args[0])
+        }
+        return BXOVoid()
+    }
+
+    public func _rem_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let index = args[0] as? BXOInteger {
+            if list.count > index.integer {
+                return list.remove(at: Int(index.integer))
+            }
+        }
+        return BXOVoid() //TODO: exception
+    }
+
+    public func _size_(args: [BXOObject]) -> BXOObject {
+        return BXOInteger(Int64(list.count))
     }
 }
 
@@ -817,7 +858,68 @@ let list5 = BXOList([
     ])
 ])
 
-let program = list4
+/*
+(this:def #list [])
+(list:add 25)
+(list:add 'Hola amic')
+(list:add 'Adeu')
+((list:at 1):print)
+((list:size):print)
+(list:rem 1)
+((list:at 1):print)
+*/
+
+let list6 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("list"),
+        BXOList([], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("list"), "add"),
+        BXOInteger(25)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("list"), "add"),
+        BXOString("Hola amic")
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("list"), "add"),
+        BXOString("Adeu")
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("list"), "at"),
+            BXOInteger(1)
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("list"), "size")
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("list"), "rem"),
+        BXOInteger(1)
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("list"), "at"),
+            BXOInteger(1)
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("list"), "size")
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ])
+])
+
+let program = list6
 LOG(program)
 print("-----------------------------")
 eval(list: program)
