@@ -24,6 +24,7 @@ class BXOObject : CustomStringConvertible {
         // Init native functions
         self.native_functions["def"] = self._def_
         self.native_functions["key"] = self._key_
+        self.native_functions["id"] = self._id_
     }
 
     var description: String {
@@ -51,6 +52,10 @@ class BXOObject : CustomStringConvertible {
             }
         }
         return BXOVoid()
+    }
+
+    public func _id_(args: [BXOObject]) -> BXOObject {
+        return BXOInteger(self.object_id)
     }
 }
 
