@@ -1,11 +1,12 @@
+//TODO: Implement method to get current this_env of any object.
+//TODO: check the type of an object: implement "type" method that returns string.
 //TODO: "def" in basic types: Object, Integer, Float, String, Boolean, Symbol, List.
 //      create a static entity_table (type_entity_table) for each class, that will hold type level defs.
-//TODO: create instances, copy of an class/object
+//TODO: create instances, copy of a class/object
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
-//TODO: Implement method to get current this_env of any object.
-//TODO: get arguments in defined functions
-//TODO: check the type of an object
+//TODO: interface with host app
+//TODO: memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
 
 import Foundation
 
@@ -440,8 +441,11 @@ func exec(stack: [BXOObject], list: BXOList) {
                 if let entity = sel.object.entity_table[sel.function] {  
                     if let lst = entity as? BXOList {
                         // Execute defined function
-                        print("Execute defined function = \(lst)")
+                        print("Execute defined function \(sel.function) = \(lst) , stack = \(stack)")
+                        // Pass the stack (arguments) to the defined function inside a variable "args"
+                        lst.entity_table["args"] = BXOList(Array(stack[1...]), true)
                         eval(list: lst)
+                        lst.entity_table.removeValue(forKey: "args")
                     }
                     else {
                         // If not a list, return the value (put in stack)
@@ -985,7 +989,72 @@ let list7 = BXOList([
     ])
 ])
 
-let program = list7
+/*
+    (this:def #num 69)
+    (num:def #myprint [(self:str):print])
+    (num:myprint)
+    (num:def #printargs [
+        ((args:size):print)
+        ((args:at 0):print)
+        ((args:at 1):print)
+    ])
+    (num:printargs 'hola' 10 false)
+*/
+
+let list8 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("num"),
+        BXOInteger(69)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("num"), "def"),
+        BXOSymbol("myprint"),
+        BXOList([
+            BXOList([
+                BXOSelector(BXOVariable(type: .SelfVar), "str")
+            ]),
+            BXOSelector(BXOVoid(), "print", true)
+        ], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("num"), "myprint")
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("num"), "def"),
+        BXOSymbol("printargs"),
+        BXOList([
+            BXOList([
+                BXOList([
+                    BXOSelector(BXOVariable("args"), "size")
+                ]),
+                BXOSelector(BXOVoid(), "print", true)
+            ]),
+            BXOList([
+                BXOList([
+                    BXOSelector(BXOVariable("args"), "at"),
+                    BXOInteger(0)
+                ]),
+                BXOSelector(BXOVoid(), "print", true)
+            ]),
+            BXOList([
+                BXOList([
+                    BXOSelector(BXOVariable("args"), "at"),
+                    BXOInteger(1)
+                ]),
+                BXOSelector(BXOVoid(), "print", true)
+            ])
+        ], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("num"), "printargs"),
+        BXOString("hola"),
+        BXOInteger(10),
+        BXOBoolean(false)
+    ])
+])
+
+let program = list8
 LOG(program)
 print("-----------------------------")
 eval(list: program)
