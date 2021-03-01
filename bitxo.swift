@@ -277,6 +277,7 @@ class BXOString : BXOObject {
         super.init()
 
         // Init native functions
+        //TODO: string primitives: size, =, +, set, at, put, add, rem
         self.native_functions["sym"] = self._sym_
         self.native_functions["print"] = self._print_
     }
@@ -1120,7 +1121,39 @@ let list8 = BXOList([
     ])
 ])
 
-let program = list8
+/*
+    (this:def #num 69)
+    (num:def #suma [self:+ (args:at 0))
+    ((num:suma 10):print)
+*/
+
+let list9 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("num"),
+        BXOInteger(69)
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("num"), "def"),
+        BXOSymbol("suma"),
+        BXOList([
+            BXOSelector(BXOVariable(type: .SelfVar), "+"),
+            BXOList([
+                BXOSelector(BXOVariable("args"), "at"),
+                BXOInteger(0)
+            ])
+        ], true)
+    ]),
+    BXOList([
+        BXOList([
+            BXOSelector(BXOVariable("num"), "suma"),
+            BXOInteger(10)
+        ]),
+        BXOSelector(BXOVoid(), "print", true)
+    ])
+])
+
+let program = list9
 LOG(program)
 print("-----------------------------")
 eval(list: program)
