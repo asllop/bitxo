@@ -161,7 +161,64 @@ class BXOFloat : BXOObject {
         super.init()
 
         // Init native functions
+        self.native_functions["+"] = self._plus_
+        self.native_functions["-"] = self._minus_
+        self.native_functions["*"] = self._multiply_
+        self.native_functions["/"] = self._divide_
+        self.native_functions["="] = self._equal_
+        self.native_functions["<"] = self._smaller_
+        self.native_functions["set"] = self._set_
         self.native_functions["str"] = self._str_
+        self.native_functions["int"] = self._int_
+    }
+
+    public func _plus_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let f = args[0] as? BXOFloat {
+            return BXOFloat(self.float + f.float)
+        }
+        return BXOVoid()
+    }
+
+    public func _minus_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let f = args[0] as? BXOFloat {
+            return BXOFloat(self.float - f.float)
+        }
+        return BXOVoid()
+    }
+
+    public func _multiply_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let f = args[0] as? BXOFloat {
+            return BXOFloat(self.float * f.float)
+        }
+        return BXOVoid()
+    }
+
+    public func _divide_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let f = args[0] as? BXOFloat {
+            return BXOFloat(self.float / f.float)
+        }
+        return BXOVoid()
+    }
+
+    public func _equal_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let f = args[0] as? BXOFloat {
+            return BXOBoolean(self.float == f.float)
+        }
+        return BXOVoid()
+    }
+
+    public func _smaller_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let f = args[0] as? BXOFloat {
+            return BXOBoolean(self.float < f.float)
+        }
+        return BXOVoid()
+    }
+
+    public func _set_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let f = args[0] as? BXOFloat {
+            self.float = f.float
+        }
+        return BXOVoid()
     }
 
     public func _str_(args: [BXOObject]) -> BXOObject {
@@ -173,6 +230,10 @@ class BXOFloat : BXOObject {
         else {
             return BXOString("\(self.float)")
         }
+    }
+
+    public func _int_(args: [BXOObject]) -> BXOObject {
+        return BXOInteger(Int64(self.float))
     }
 }
 
