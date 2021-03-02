@@ -1,4 +1,3 @@
-//TODO: Implement method to get current this_env of any object.
 //TODO: check the type of an object: implement "type" method that returns string.
 //TODO: "def" in basic types: Object, Integer, Float, String, Boolean, Symbol, List.
 //      create a static entity_table (type_entity_table) for each class, that will hold type level defs.
@@ -7,6 +6,7 @@
 //TODO: Exceptions
 //TODO: interface with host app
 //TODO: memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
+//TODO: always use pop_object selectors
 
 import Foundation
 
@@ -16,6 +16,8 @@ class BXOObject : CustomStringConvertible {
     public var object_id : Int64
     public var native_functions : [String:([BXOObject]) -> BXOObject] = [:]
     public var entity_table : [String:BXOObject] = [:]
+    // Environment where the object resides
+    public weak var self_object : BXOObject? = nil
 
     public init() {
         self.object_id = BXOObject.next_object_id
@@ -25,6 +27,7 @@ class BXOObject : CustomStringConvertible {
         self.native_functions["def"] = self._def_
         self.native_functions["key"] = self._key_
         self.native_functions["id"] = self._id_
+        self.native_functions["env"] = self._env_
     }
 
     var description: String {
@@ -34,10 +37,8 @@ class BXOObject : CustomStringConvertible {
     public func _def_(args: [BXOObject]) -> BXOObject {
         if args.count > 1 {
             if let symbol = args[0] as? BXOSymbol {
+                args[1].self_object = self
                 entity_table[symbol.symbol] = args[1]
-            }
-            if let lst = args[1] as? BXOList {
-                lst.self_object = self
             }
         }
         return BXOVoid()
@@ -56,6 +57,13 @@ class BXOObject : CustomStringConvertible {
 
     public func _id_(args: [BXOObject]) -> BXOObject {
         return BXOInteger(self.object_id)
+    }
+
+    public func _env_(args: [BXOObject]) -> BXOObject {
+        if let self_object = self.self_object {
+            return self_object
+        }
+        return  BXOVoid()
     }
 }
 
@@ -340,8 +348,6 @@ class BXOVoid : BXOObject {}
 class BXOList : BXOObject {
     public var list : [BXOObject]
     public let literal : Bool
-    // Object where the List resides (if it is a defined function)
-    public weak var self_object : BXOObject? = nil
     // Local environment
     public weak var this_env : BXOList? = nil
 
@@ -1008,6 +1014,9 @@ let list6 = BXOList([
     ])
 ])
 
+// IMPORTANT LESSON:
+// Never put a variable inside a selector, use pop_object instead because variables can changes, and
+// the object inside a selector is static.
 /*
 (this:def #dict [])
 
@@ -1153,7 +1162,57 @@ let list9 = BXOList([
     ])
 ])
 
-let program = list9
+/*
+    (this:def #counter 0)
+    ([counter:< 10]:while [
+        ((counter:env):def #counter (counter:+ 1))
+        (counter:print)
+    ])
+    ('========================':print)
+    (counter:print)
+*/
+
+let list10 = BXOList([
+    BXOList([
+        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOSymbol("counter"),
+        BXOInteger(0)
+    ]),
+    BXOList([
+        BXOSelector(BXOList([
+            BXOVariable("counter"),
+            BXOSelector(BXOVoid(), "<", true),
+            BXOInteger(10)
+        ], true), "while"),
+        BXOList([
+            BXOList([
+                BXOList([
+                    BXOVariable("counter"),
+                    BXOSelector(BXOVoid(), "env", true),
+                ]),
+                BXOSelector(BXOVoid(), "def", true),
+                BXOSymbol("counter"),
+                BXOList([
+                    BXOVariable("counter"),
+                    BXOSelector(BXOVoid(), "+", true),
+                    BXOInteger(1)
+                ])
+            ]),
+            BXOList([
+                BXOVariable("counter"),
+                BXOSelector(BXOVoid(), "print", true)
+            ])
+        ], true)
+    ]),
+    BXOList([
+        BXOSelector(BXOString("========================"), "print")
+    ]),
+    BXOList([
+        BXOSelector(BXOVariable("counter"), "print")
+    ])
+])
+
+let program = list10
 LOG(program)
 print("-----------------------------")
 eval(list: program)
