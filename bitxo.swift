@@ -6,7 +6,6 @@
 //TODO: Exceptions
 //TODO: interface with host app
 //TODO: memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
-//TODO: always use pop_object selectors
 
 import Foundation
 
@@ -86,7 +85,7 @@ class BXOInteger : BXOObject  {
         self.native_functions["str"] = self._str_
         self.native_functions["float"] = self._float_
 
-        //TESTING: should be defined in bitxo -> (Integer:def #print [(self:str):print])
+        //TESTING: should be defined with bitxo -> (Integer:def #print [(self:str):print])
         self.native_functions["print"] = self._print_
     }
 
@@ -156,7 +155,7 @@ class BXOInteger : BXOObject  {
 
     //TESTING
     public func _print_(args: [BXOObject]) -> BXOObject {
-        print("PRINT >>>>>>>>>>> \(self.integer)")
+        print("PRINT INT: \(self.integer)")
         return BXOVoid()
     }
 }
@@ -309,22 +308,23 @@ class BXOSymbol : BXOObject {
 
         // Init native functions
         self.native_functions["str"] = self._str_
+        self.native_functions["sel"] = self._sel_
     }
 
     public func _str_(args: [BXOObject]) -> BXOObject {
         return BXOString(self.symbol)
     }
+
+    public func _sel_(args: [BXOObject]) -> BXOObject {
+        return BXOSelector(self.symbol)
+    }
 }
 
 class BXOSelector : BXOObject {
     public var function : String
-    public var object : BXOObject
-    public var pop_object : Bool
 
-    public init(_ object: BXOObject, _ function: String, _ pop_object : Bool = false) {
-        self.object = object
+    public init(_ function: String) {
         self.function = function
-        self.pop_object = pop_object
     }
 }
 
@@ -493,30 +493,31 @@ func pop() -> BXOObject? {
 }
 
 func exec(stack: [BXOObject], list: BXOList) {
-    if stack.count > 0 {
-        if let sel = stack[0] as? BXOSelector {
+    if stack.count > 1 {
+        // stack[1] contains the selector? then stack[0] contains the object
+        if let sel = stack[1] as? BXOSelector {
             // If object of selector is a list, set this_env
-            if let lst_obj = sel.object as? BXOList {
+            if let lst_obj = stack[0] as? BXOList {
                 print("Object of selector is a list, set this_env")
                 lst_obj.this_env = list
             }
 
-            if let function = sel.object.native_functions[sel.function] {
+            if let function = stack[0].native_functions[sel.function] {
                 // Execute native function
-                let res = function(Array(stack[1...]))
+                let res = function(Array(stack[2...]))
                 if !(res is BXOVoid) {
                     push(value: res)
                 }
-                print("Executed function \(sel.function) on \(sel.object) , result = ", terminator: "")
+                print("Executed function \(sel.function) on \(stack[0]) , result = ", terminator: "")
                 LOG(res)
             }
             else {
-                if let entity = sel.object.entity_table[sel.function] {  
+                if let entity = stack[0].entity_table[sel.function] {  
                     if let lst = entity as? BXOList {
                         // Execute defined function
                         print("Execute defined function \(sel.function) = \(lst) , stack = \(stack)")
                         // Pass the stack (arguments) to the defined function inside a variable "args"
-                        lst.entity_table["args"] = BXOList(Array(stack[1...]), true)
+                        lst.entity_table["args"] = BXOList(Array(stack[2...]), true)
                         eval(list: lst)
                         lst.entity_table.removeValue(forKey: "args")
                     }
@@ -528,18 +529,13 @@ func exec(stack: [BXOObject], list: BXOList) {
             }
         }
         else {
-            if stack.count > 1, let sel = stack[1] as? BXOSelector, sel.pop_object == true {
-                print("Exec selector with pop_object \(sel) = \(stack)")
-                // Pop stack[0], set it into selector object and call exec with modified stack
-                var s = stack
-                sel.object = s.remove(at: 0)
-                exec(stack: s, list: list)
-            }
-            else {
-                //Push last element to the current stack. Check if last element exist, stack may be empty if BXOVoid is returned
-                push(value: stack[stack.count - 1])
-            }
+            //Push last element to the current stack.
+            push(value: stack[stack.count - 1])
         }
+    }
+    else if stack.count == 1 {
+        //Push last element to the current stack (for lists with 1 element only)
+        push(value: stack[stack.count - 1])
     }
 }
 
@@ -589,10 +585,6 @@ func eval(list: BXOList) {
             eval(list: lst)
         }
         else {
-            // If selector with variable, get content and put in the selector
-            if let sel = obj as? BXOSelector, let v = sel.object as? BXOVariable {
-                sel.object = obtain(variable: v, list: list)
-            }
             // Store object in current stack
             if let v = obj as? BXOVariable {
                 push(value: obtain(variable: v, list: list))
@@ -622,7 +614,7 @@ func LOG(_ obj: BXOObject, _ level: Int = 0) {
         print("<Symbol: ID = \(sym.object_id), symbol = #\(sym.symbol)>")
     }
     else if let sel = obj as? BXOSelector {
-        print("<Selector: ID = \(sel.object_id), object = \(BXOTYPE(sel.object)), function = \(sel.function)>")
+        print("<Selector: ID = \(sel.object_id), function = \(sel.function)>")
     }
     else if let vari = obj as? BXOVariable {
         print("<Variable: ID = \(vari.object_id), name = \(vari.name)>")
@@ -684,485 +676,6 @@ func BXOTYPE(_ obj: BXOObject) -> String {
 }
 
 /*
-"The following code corresponds to the defined list structure below"
-(
-    (this:def #numA 10)
-
-    (
-        (this:def #numB 20)
-        (numA:+ numB) "Return 30"
-    )
-
-    "Here numB doesn't exist"
-    "(numA:+ numB)" "Call + with a Void argument -> this should fire Exception"
-    "(numB:+ numA)" "Try to call + on a Void object -> this should fire Exception"
-
-    "Define inc function inside numA"
-    (numA:def #myNum 66)
-    (numA:def #foo [
-        (self:+ 1)      "Return 1"
-        (self:+ myNum)  "Return 76"
-        (myNum:- self)  "Return 56"
-    ])
-
-    ((numA:foo):print)
-)
-*/
-let list1 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("numA"),
-        BXOInteger(10)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable(type: .ThisVar), "def"),
-            BXOSymbol("numB"),
-            BXOInteger(20)
-        ]),
-        BXOList([
-            BXOSelector(BXOVariable("numA"), "+"),
-            BXOVariable("numB")
-        ])
-    ]),
-    /*
-    BXOList([
-        BXOSelector(BXOVariable("numA"), "+"),
-        BXOVariable("numB")
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("numB"), "+"),
-        BXOVariable("numA")
-    ]),
-    */
-    BXOList([
-        BXOSelector(BXOVariable("numA"), "def"),
-        BXOSymbol("myNum"),
-        BXOInteger(66)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("numA"), "def"),
-        BXOSymbol("foo"),
-        BXOList([
-            BXOList([
-                BXOSelector(BXOVariable(type: .SelfVar), "+"),
-                BXOInteger(1)                
-            ]),
-            BXOList([
-                BXOSelector(BXOVariable(type: .SelfVar), "+"),
-                BXOVariable("myNum")
-            ]),
-            BXOList([
-                BXOSelector(BXOVariable("myNum"), "-"),
-                BXOVariable(type: .SelfVar)
-            ])
-        ], true)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("numA"), "foo"),
-        ]),
-        BXOSelector(BXOVoid(), "print", true),
-    ])
-])
-
-/*
-(
-    (this:def #counter 0)
-    (
-        [counter:< 10]:while [
-            (counter:set (counter:+ 1))
-            (counter:print)
-        ]
-    )
-)
-
-Inside the loop block we cannot define counter again, because it will be defines inside the List of the block,
-and the definition will not be accessible from other blocks (condition).
-
-Instead, we use "set" to change value.
-
-To resolve this problem we could create a selector that returns the local environment of any object.
-
-    (counter:this)
-
-So we can do:
-    
-    ((counter:this):def #counter (counter:+ 1))
-*/
-
-let list2 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("counter"),
-        BXOInteger(0)
-    ]),
-    BXOList([
-        BXOSelector(BXOList([
-            BXOSelector(BXOVariable("counter"), "<"),
-            BXOInteger(10)
-        ], true), "while"),
-        BXOList([
-            BXOList([
-                BXOSelector(BXOVariable("counter"), "print")
-            ]),
-            BXOList([
-                BXOSelector(BXOVariable("counter"), "set"),
-                BXOList([
-                    BXOSelector(BXOVariable("counter"), "+"),
-                    BXOInteger(1)
-                ])
-            ])
-        ], true)
-    ])
-])
-
-/*
-(
-    (this:def #counter 0)
-    (
-        [counter:< 10]:if [
-            ("Counter menor que 10":print)
-        ]
-    )
-    (
-        [counter:= 10]:if-else
-        [
-            ("Counter igual a 10":print)
-        ]
-        [
-            ("Counter diferent de 10":print)
-        ]
-    )
-)
-*/
-
-let list3 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("counter"),
-        BXOInteger(0)
-    ]),
-    BXOList([
-        BXOSelector(BXOList([
-            BXOSelector(BXOVariable("counter"), "<"),
-            BXOInteger(10)
-        ], true), "if"),
-        BXOList([
-            BXOList([
-                BXOSelector(BXOString("Counter menor que 10"), "print")
-            ])
-        ], true)
-    ]),
-    BXOList([
-        BXOSelector(BXOList([
-            BXOSelector(BXOVariable("counter"), "="),
-            BXOInteger(10)
-        ], true), "if-else"),
-        BXOList([
-            BXOList([
-                BXOSelector(BXOString("ounter igual a 10"), "print")
-            ])
-        ], true),
-        BXOList([
-            BXOList([
-                BXOSelector(BXOString("Counter diferent de 10"), "print")
-            ])
-        ], true)
-    ])
-])
-
-/*
-(this:def #inum 10)
-(this:def #fnum 9.9)
-(this:def #symb #hola)
-
-((inum:str):print)
-((fnum:str):print)
-((fnum:str "%.3f"):print)
-((symb:str):print)
-*/
-
-let list4 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("inum"),
-        BXOInteger(10)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("fnum"),
-        BXOFloat(9.9)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("symb"),
-        BXOSymbol("hola")
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("inum"), "str"),
-        ]),
-        BXOSelector(BXOVoid(), "print", true),
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("fnum"), "str"),
-        ]),
-        BXOSelector(BXOVoid(), "print", true),
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("fnum"), "str"),
-            BXOString("%.3f")
-        ]),
-        BXOSelector(BXOVoid(), "print", true),
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("symb"), "str"),
-        ]),
-        BXOSelector(BXOVoid(), "print", true),
-    ])
-])
-
-/*
-(this:def #inum 10)
-((((inum:+ 1):* 2):str):print)
-*/
-
-let list5 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("inum"),
-        BXOInteger(10)
-    ]),
-    BXOList([
-        BXOList([
-            BXOList([
-                BXOList([
-                    BXOSelector(BXOVariable("inum"), "+"),
-                    BXOInteger(1)
-                ]),
-                BXOSelector(BXOVoid(), "*", true),
-                BXOInteger(2)
-            ]),
-            BXOSelector(BXOVoid(), "str", true)
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ])
-])
-
-/*
-(this:def #list [])
-(list:add 25)
-(list:add 'Hola amic')
-(list:add 'Adeu')
-((list:at 1):print)
-((list:size):print)
-(list:rem 1)
-((list:at 1):print)
-*/
-
-let list6 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("list"),
-        BXOList([], true)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("list"), "add"),
-        BXOInteger(25)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("list"), "add"),
-        BXOString("Hola amic")
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("list"), "add"),
-        BXOString("Adeu")
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("list"), "at"),
-            BXOInteger(1)
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("list"), "size")
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("list"), "rem"),
-        BXOInteger(1)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("list"), "at"),
-            BXOInteger(1)
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("list"), "size")
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ])
-])
-
-// IMPORTANT LESSON:
-// Never put a variable inside a selector, use pop_object instead because variables can changes, and
-// the object inside a selector is static.
-/*
-(this:def #dict [])
-
-(dict:def #age 37)
-(dict:def #name 'Andreu')
-
-((dict:age):print)
-((dict:name):print)
-((dict:key #name):print)
-*/
-
-let list7 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("dict"),
-        BXOList([], true)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("dict"), "def"),
-        BXOSymbol("age"),
-        BXOInteger(37)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("dict"), "def"),
-        BXOSymbol("name"),
-        BXOString("Andreu")
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("dict"), "age")
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("dict"), "name")
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("dict"), "key"),
-            BXOSymbol("name")
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ])
-])
-
-/*
-    (this:def #num 69)
-    (num:def #myprint [(self:str):print])
-    (num:myprint)
-    (num:def #printargs [
-        ((args:size):print)
-        ((args:at 0):print)
-        ((args:at 1):print)
-    ])
-    (num:printargs 'hola' 10 false)
-*/
-
-let list8 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("num"),
-        BXOInteger(69)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("num"), "def"),
-        BXOSymbol("myprint"),
-        BXOList([
-            BXOList([
-                BXOSelector(BXOVariable(type: .SelfVar), "str")
-            ]),
-            BXOSelector(BXOVoid(), "print", true)
-        ], true)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("num"), "myprint")
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("num"), "def"),
-        BXOSymbol("printargs"),
-        BXOList([
-            BXOList([
-                BXOList([
-                    BXOSelector(BXOVariable("args"), "size")
-                ]),
-                BXOSelector(BXOVoid(), "print", true)
-            ]),
-            BXOList([
-                BXOList([
-                    BXOSelector(BXOVariable("args"), "at"),
-                    BXOInteger(0)
-                ]),
-                BXOSelector(BXOVoid(), "print", true)
-            ]),
-            BXOList([
-                BXOList([
-                    BXOSelector(BXOVariable("args"), "at"),
-                    BXOInteger(1)
-                ]),
-                BXOSelector(BXOVoid(), "print", true)
-            ])
-        ], true)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("num"), "printargs"),
-        BXOString("hola"),
-        BXOInteger(10),
-        BXOBoolean(false)
-    ])
-])
-
-/*
-    (this:def #num 69)
-    (num:def #suma [self:+ (args:at 0))
-    ((num:suma 10):print)
-*/
-
-let list9 = BXOList([
-    BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
-        BXOSymbol("num"),
-        BXOInteger(69)
-    ]),
-    BXOList([
-        BXOSelector(BXOVariable("num"), "def"),
-        BXOSymbol("suma"),
-        BXOList([
-            BXOSelector(BXOVariable(type: .SelfVar), "+"),
-            BXOList([
-                BXOSelector(BXOVariable("args"), "at"),
-                BXOInteger(0)
-            ])
-        ], true)
-    ]),
-    BXOList([
-        BXOList([
-            BXOSelector(BXOVariable("num"), "suma"),
-            BXOInteger(10)
-        ]),
-        BXOSelector(BXOVoid(), "print", true)
-    ])
-])
-
-/*
     (this:def #counter 0)
     ([counter:< 10]:while [
         ((counter:env):def #counter (counter:+ 1))
@@ -1172,47 +685,162 @@ let list9 = BXOList([
     (counter:print)
 */
 
-let list10 = BXOList([
+let list1 = BXOList([
     BXOList([
-        BXOSelector(BXOVariable(type: .ThisVar), "def"),
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
         BXOSymbol("counter"),
         BXOInteger(0)
     ]),
     BXOList([
-        BXOSelector(BXOList([
+        BXOList([
             BXOVariable("counter"),
-            BXOSelector(BXOVoid(), "<", true),
+            BXOSelector("<"),
             BXOInteger(10)
-        ], true), "while"),
+        ], true),
+        BXOSelector("while"),
         BXOList([
             BXOList([
                 BXOList([
                     BXOVariable("counter"),
-                    BXOSelector(BXOVoid(), "env", true),
+                    BXOSelector("env"),
                 ]),
-                BXOSelector(BXOVoid(), "def", true),
+                BXOSelector("def"),
                 BXOSymbol("counter"),
                 BXOList([
                     BXOVariable("counter"),
-                    BXOSelector(BXOVoid(), "+", true),
+                    BXOSelector("+"),
                     BXOInteger(1)
                 ])
             ]),
             BXOList([
                 BXOVariable("counter"),
-                BXOSelector(BXOVoid(), "print", true)
+                BXOSelector("print")
             ])
         ], true)
     ]),
     BXOList([
-        BXOSelector(BXOString("========================"), "print")
+        BXOString("========================"),
+        BXOSelector("print")
     ]),
     BXOList([
-        BXOSelector(BXOVariable("counter"), "print")
+        BXOVariable("counter"),
+        BXOSelector("print")
     ])
 ])
 
-let program = list10
+/*
+    (this:def #num 101)
+    (num (#print:sel))
+*/
+let list2 = BXOList([
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("num"),
+        BXOInteger(101)
+    ]),
+    BXOList([
+        BXOVariable("num"),
+        BXOList([
+            BXOSymbol("print"),
+            BXOSelector("sel")
+        ])
+    ])
+])
+
+/*
+    (this:def #num (101))
+    (num:print)
+    (
+        (num:print)
+        (
+            (num:print)
+        )
+        (this:def #num 99)
+        (num:print)
+    )
+    (num:print)
+    (('Hola'):print)
+    ('Adeu':print)
+    (num:def #suma [self:+ (args:at 0)])
+    ((num:suma 10):print)
+*/
+
+let list3 = BXOList([
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("num"),
+        BXOList([
+            BXOInteger(101)
+        ])
+    ]),
+    BXOList([
+        BXOVariable("num"),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOList([
+            BXOVariable("num"),
+            BXOSelector("print")
+        ]),
+        BXOList([
+            BXOList([
+                BXOVariable("num"),
+                BXOSelector("print")
+            ])
+        ]),
+        BXOList([
+            BXOVariable(type: .ThisVar),
+            BXOSelector("def"),
+            BXOSymbol("num"),
+            BXOInteger(99)
+        ]),
+        BXOList([
+            BXOVariable("num"),
+            BXOSelector("print")
+        ])
+    ]),
+    BXOList([
+        BXOVariable("num"),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOList([
+            BXOString("Hola")
+        ]),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOString("Adeu"),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOVariable("num"),
+        BXOSelector("def"),
+        BXOSymbol("suma"),
+        BXOList([
+            BXOVariable(type: .SelfVar),
+            BXOSelector("+"),
+            BXOList([
+                BXOVariable("args"),
+                BXOSelector("at"),
+                BXOInteger(0)
+            ])
+        ], true)
+    ]),
+    BXOList([
+        BXOList([
+            BXOVariable("num"),
+            BXOSelector("suma"),
+            BXOInteger(10)
+        ]),
+        BXOSelector("print")
+    ])
+])
+
+let program = list3
 LOG(program)
 print("-----------------------------")
 eval(list: program)
