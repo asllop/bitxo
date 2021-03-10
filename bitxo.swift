@@ -1,12 +1,7 @@
-//TODO: create instances, copy of a class/object
+//TODO: create instances, copy of a class/object & memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
 //TODO: interface with host app
-//TODO: memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
-
-/*
-TODO: define class functions in code.
-*/
 
 import Foundation
 
@@ -383,6 +378,13 @@ class BXOList : BXOObject {
         self.native_functions["add"] = self._add_
         self.native_functions["rem"] = self._rem_
         self.native_functions["size"] = self._size_
+        self.native_functions["def_integer"] = self._def_integer_
+        self.native_functions["def_float"] = self._def_float_
+        self.native_functions["def_boolean"] = self._def_boolean_
+        self.native_functions["def_string"] = self._def_string_
+        self.native_functions["def_symbol"] = self._def_symbol_
+        self.native_functions["def_list"] = self._def_list_
+        self.native_functions["def_object"] = self._def_object_
     }
 
     override public func bxotype() -> String {
@@ -486,6 +488,47 @@ class BXOList : BXOObject {
 
     public func _size_(args: [BXOObject]) -> BXOObject {
         return BXOInteger(Int64(list.count))
+    }
+
+    public func _def_integer_(args: [BXOObject]) -> BXOObject {
+        return def_type(args: args, type: "Integer")
+    }
+
+    public func _def_float_(args: [BXOObject]) -> BXOObject {
+        return def_type(args: args, type: "Float")
+    }
+
+    public func _def_boolean_(args: [BXOObject]) -> BXOObject {
+        return def_type(args: args, type: "Boolean")
+    }
+
+    public func _def_string_(args: [BXOObject]) -> BXOObject {
+        return def_type(args: args, type: "String")
+    }
+
+    public func _def_symbol_(args: [BXOObject]) -> BXOObject {
+        return def_type(args: args, type: "Symbol")
+    }
+
+    public func _def_list_(args: [BXOObject]) -> BXOObject {
+        return def_type(args: args, type: "List")
+    }
+
+    public func _def_object_(args: [BXOObject]) -> BXOObject {
+        return def_type(args: args, type: "Object")
+    }
+
+    public func def_type(args: [BXOObject], type: String) -> BXOObject {
+        if args.count > 1 {
+            if let symbol = args[0] as? BXOSymbol {
+                args[1].self_object = self
+                if (type_entity_table[type] != nil) {
+                    print("Define new class method \(type) \(args)")
+                    type_entity_table[type]![symbol.symbol] = args[1]
+                }
+            }
+        }
+        return BXOVoid()
     }
 }
 
@@ -1027,21 +1070,25 @@ let list6 = BXOList([
 ])
 
 /*
-Add a type selector for Integer -> [(self:str):print]
-
-(Integer:def #print [(self:str):print])
+Append the followinf code to any program:
+(this:def_integer #print [(self:str):print])
 */
-type_entity_table["Integer"]!["print"] = BXOList([
+let int_print = BXOList([
+    BXOVariable(type: .ThisVar),
+    BXOSelector("def_integer"),
+    BXOSymbol("print"),
     BXOList([
-        BXOVariable(type: .SelfVar),
-        BXOSelector("str")
-    ]),
-    BXOSelector("print")
-], true)
-
-print("\(type_entity_table)")
+        BXOList([
+            BXOVariable(type: .SelfVar),
+            BXOSelector("str")
+        ]),
+        BXOSelector("print")
+    ], true)
+])
 
 let program = list6
+program.list.insert(int_print, at: 0)
+
 LOG(program)
 print("-----------------------------")
 eval(list: program)
