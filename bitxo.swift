@@ -4,6 +4,10 @@
 //TODO: interface with host app
 //TODO: memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
 
+/*
+TODO: define class functions in code.
+*/
+
 import Foundation
 
 var type_entity_table : [String:[String:BXOObject]] = [
@@ -547,13 +551,6 @@ func exec(stack: [BXOObject], list: BXOList) {
                 LOG(res)
             }
             else {
-                if stack[0].entity_table[sel.function] == nil {
-                    if let type_entity = type_entity_table[stack[0].bxotype()]![sel.function] {
-                        print("Found function \(sel.function) in class \(stack[0].bxotype())")
-                        _ = stack[0]._def_(args: [BXOSymbol(sel.function), type_entity])
-                    }
-                }
-
                 if let entity = stack[0].entity_table[sel.function] {  
                     if let lst = entity as? BXOList {
                         // Execute defined function
@@ -566,6 +563,20 @@ func exec(stack: [BXOObject], list: BXOList) {
                     else {
                         // If not a list, return the value (put in stack)
                         push(value: entity)
+                    }
+                }
+                else if let type_entity = type_entity_table[stack[0].bxotype()]![sel.function] {
+                    print("Execute class function \(sel.function) from class \(stack[0].bxotype())")
+                    if let lst = type_entity as? BXOList {
+                        lst.entity_table["args"] = BXOList(Array(stack[2...]), true)
+                        lst.self_object = stack[0]
+                        eval(list: lst)
+                        lst.entity_table.removeValue(forKey: "args")
+                        lst.self_object = nil
+                    }
+                    else {
+                        // If not a list, return the value (put in stack)
+                        push(value: type_entity)
                     }
                 }
             }
