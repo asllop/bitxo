@@ -1,6 +1,3 @@
-//TODO: check the type of an object: implement "type" method that returns string.
-//TODO: "def" in basic types: Object, Integer, Float, String, Boolean, Symbol, List.
-//      create a static entity_table (type_entity_table) for each class, that will hold type level defs.
 //TODO: create instances, copy of a class/object
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
@@ -8,6 +5,16 @@
 //TODO: memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
 
 import Foundation
+
+var type_entity_table : [String:[String:BXOObject]] = [
+    "Integer":[:],
+    "Float":[:],
+    "Boolean":[:],
+    "String":[:],
+    "Symbol":[:],
+    "List":[:],
+    "Object":[:],
+]
 
 class BXOObject : CustomStringConvertible {
     private static var next_object_id : Int64 = 1
@@ -27,12 +34,17 @@ class BXOObject : CustomStringConvertible {
         self.native_functions["key"] = self._key_
         self.native_functions["id"] = self._id_
         self.native_functions["env"] = self._env_
+        self.native_functions["type"] = self._type_
     }
 
     var description: String {
         return "\(type(of: self))<\(self.object_id)>"
     }
 
+    public func bxotype() -> String {
+        return "Object"
+    }
+    
     public func _def_(args: [BXOObject]) -> BXOObject {
         if args.count > 1 {
             if let symbol = args[0] as? BXOSymbol {
@@ -64,6 +76,10 @@ class BXOObject : CustomStringConvertible {
         }
         return  BXOVoid()
     }
+
+    public func _type_(args: [BXOObject]) -> BXOObject {
+        return BXOString(self.bxotype())
+    }
 }
 
 class BXOInteger : BXOObject  {
@@ -84,9 +100,10 @@ class BXOInteger : BXOObject  {
         self.native_functions["set"] = self._set_
         self.native_functions["str"] = self._str_
         self.native_functions["float"] = self._float_
+    }
 
-        //TESTING: should be defined with bitxo -> (Integer:def #print [(self:str):print])
-        self.native_functions["print"] = self._print_
+    override public func bxotype() -> String {
+        return "Integer"
     }
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
@@ -152,12 +169,6 @@ class BXOInteger : BXOObject  {
     public func _float_(args: [BXOObject]) -> BXOObject {
         return BXOFloat(Double(self.integer))
     }
-
-    //TESTING
-    public func _print_(args: [BXOObject]) -> BXOObject {
-        print("PRINT INT: \(self.integer)")
-        return BXOVoid()
-    }
 }
 
 class BXOFloat : BXOObject {
@@ -177,6 +188,10 @@ class BXOFloat : BXOObject {
         self.native_functions["set"] = self._set_
         self.native_functions["str"] = self._str_
         self.native_functions["int"] = self._int_
+    }
+
+    override public func bxotype() -> String {
+        return "Float"
     }
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
@@ -257,6 +272,10 @@ class BXOBoolean : BXOObject {
         self.native_functions["not"] = self._not_
     }
 
+    override public func bxotype() -> String {
+        return "Boolean"
+    }
+
     public func _and_(args: [BXOObject]) -> BXOObject {
         if args.count > 0, let b = args[0] as? BXOBoolean {
             return BXOBoolean(self.boolean && b.boolean)
@@ -289,6 +308,10 @@ class BXOString : BXOObject {
         self.native_functions["print"] = self._print_
     }
 
+    override public func bxotype() -> String {
+        return "String"
+    }
+
     public func _sym_(args: [BXOObject]) -> BXOObject {
         return BXOSymbol(self.string)
     }
@@ -311,6 +334,10 @@ class BXOSymbol : BXOObject {
         self.native_functions["sel"] = self._sel_
     }
 
+    override public func bxotype() -> String {
+        return "Symbol"
+    }
+
     public func _str_(args: [BXOObject]) -> BXOObject {
         return BXOString(self.symbol)
     }
@@ -326,24 +353,11 @@ class BXOSelector : BXOObject {
     public init(_ function: String) {
         self.function = function
     }
-}
 
-class BXOVariable : BXOObject {
-    public enum VarType: Int {
-        case ThisVar = 0
-        case SelfVar = 1
-        case NormalVar = 2
-    }
-    public var name : String
-    public var type : VarType
-
-    public init(_ name: String = "", type: VarType = VarType.NormalVar) {
-        self.name = name
-        self.type = type
+    override public func bxotype() -> String {
+        return "Selector"
     }
 }
-
-class BXOVoid : BXOObject {}
 
 class BXOList : BXOObject {
     public var list : [BXOObject]
@@ -365,6 +379,10 @@ class BXOList : BXOObject {
         self.native_functions["add"] = self._add_
         self.native_functions["rem"] = self._rem_
         self.native_functions["size"] = self._size_
+    }
+
+    override public func bxotype() -> String {
+        return "List"
     }
 
     public func _if_(args: [BXOObject]) -> BXOObject {
@@ -467,6 +485,23 @@ class BXOList : BXOObject {
     }
 }
 
+class BXOVariable : BXOObject {
+    public enum VarType: Int {
+        case ThisVar = 0
+        case SelfVar = 1
+        case NormalVar = 2
+    }
+    public var name : String
+    public var type : VarType
+
+    public init(_ name: String = "", type: VarType = VarType.NormalVar) {
+        self.name = name
+        self.type = type
+    }
+}
+
+class BXOVoid : BXOObject {}
+
 var stacks : [[BXOObject]] = []
 
 func pushStack() {
@@ -512,6 +547,13 @@ func exec(stack: [BXOObject], list: BXOList) {
                 LOG(res)
             }
             else {
+                if stack[0].entity_table[sel.function] == nil {
+                    if let type_entity = type_entity_table[stack[0].bxotype()]![sel.function] {
+                        print("Found function \(sel.function) in class \(stack[0].bxotype())")
+                        _ = stack[0]._def_(args: [BXOSymbol(sel.function), type_entity])
+                    }
+                }
+
                 if let entity = stack[0].entity_table[sel.function] {  
                     if let lst = entity as? BXOList {
                         // Execute defined function
@@ -731,7 +773,7 @@ let list1 = BXOList([
 
 /*
     (this:def #num 101)
-    (num (#print:sel))
+    (num (#print:sel))  "equivalent to -> (num:print). Symbol:sel is a way to generate selectors dynamically."
 */
 let list2 = BXOList([
     BXOList([
@@ -840,7 +882,155 @@ let list3 = BXOList([
     ])
 ])
 
-let program = list3
+/*
+TODO: Example with nested if-else structure:
+
+    (this:def #option 0)
+
+    [option:= 0]:if-else
+    [
+        ('Zero':print)
+    ]
+    [
+        [option:= 1]:if-else
+        [
+            ('One':print)
+        ]
+        [
+            [option:= 2]:if-else
+            [
+                ('Two':print)
+            ]
+            [
+                [option:= 3]:if-else
+                [
+                    ('Three':print)
+                ]
+                [
+                    ('Other option':print)
+                ]
+            ]
+        ]
+    ]
+*/
+
+let list4 = BXOList([
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("option"),
+        BXOInteger(0)
+    ]),
+    /*
+    BXOList([
+        BXOVariable("option"),
+        BXOSelector("="),
+        BXOInteger(0)
+    ], true),
+    BXOSelector("if-else"),
+    BXOList([
+        BXOList([
+            BXOString("Zero"),
+            BXOSelector("print")
+        ])
+    ], true),
+    BXOList([
+        // Else
+    ], true)
+    */
+])
+
+/*
+    (this:def #num 101)
+    (this:def #str 'hola')
+    (this:def #flt 9.9)
+    ((num:type):print)
+    ((str:type):print)
+    ((flt:type):print)
+    ((this:type):print)
+*/
+let list5 = BXOList([
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("num"),
+        BXOInteger(101)
+    ]),
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("str"),
+        BXOString("hola")
+    ]),
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("flt"),
+        BXOFloat(9.9)
+    ]),
+    BXOList([
+        BXOList([
+            BXOVariable("num"),
+            BXOSelector("type")
+        ]),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOList([
+            BXOVariable("str"),
+            BXOSelector("type")
+        ]),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOList([
+            BXOVariable("flt"),
+            BXOSelector("type")
+        ]),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOList([
+            BXOVariable(type: .ThisVar),
+            BXOSelector("type")
+        ]),
+        BXOSelector("print")
+    ])
+])
+
+/*
+    (this:def #num 101)
+    (num:print)
+*/
+let list6 = BXOList([
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("num"),
+        BXOInteger(101)
+    ]),
+    BXOList([
+        BXOVariable("num"),
+        BXOSelector("print")
+    ])
+])
+
+/*
+Add a type selector for Integer -> [(self:str):print]
+
+(Integer:def #print [(self:str):print])
+*/
+type_entity_table["Integer"]!["print"] = BXOList([
+    BXOList([
+        BXOVariable(type: .SelfVar),
+        BXOSelector("str")
+    ]),
+    BXOSelector("print")
+], true)
+
+print("\(type_entity_table)")
+
+let program = list6
 LOG(program)
 print("-----------------------------")
 eval(list: program)
