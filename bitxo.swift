@@ -34,6 +34,7 @@ class BXOObject : CustomStringConvertible {
         self.native_functions["id"] = self._id_
         self.native_functions["env"] = self._env_
         self.native_functions["type"] = self._type_
+        self.native_functions["type_def"] = self._type_def_
     }
 
     var description: String {
@@ -78,6 +79,19 @@ class BXOObject : CustomStringConvertible {
 
     public func _type_(args: [BXOObject]) -> BXOObject {
         return BXOString(self.bxotype())
+    }
+
+    public func _type_def_(args: [BXOObject]) -> BXOObject {
+        if args.count > 1 {
+            if let symbol = args[0] as? BXOSymbol {
+                args[1].self_object = self
+                if (type_entity_table[self.bxotype()] != nil) {
+                    print("Define new class method \(self.bxotype()) \(args)")
+                    type_entity_table[self.bxotype()]![symbol.symbol] = args[1]
+                }
+            }
+        }
+        return BXOVoid()
     }
 }
 
@@ -378,13 +392,6 @@ class BXOList : BXOObject {
         self.native_functions["add"] = self._add_
         self.native_functions["rem"] = self._rem_
         self.native_functions["size"] = self._size_
-        self.native_functions["def_integer"] = self._def_integer_
-        self.native_functions["def_float"] = self._def_float_
-        self.native_functions["def_boolean"] = self._def_boolean_
-        self.native_functions["def_string"] = self._def_string_
-        self.native_functions["def_symbol"] = self._def_symbol_
-        self.native_functions["def_list"] = self._def_list_
-        self.native_functions["def_object"] = self._def_object_
     }
 
     override public func bxotype() -> String {
@@ -488,47 +495,6 @@ class BXOList : BXOObject {
 
     public func _size_(args: [BXOObject]) -> BXOObject {
         return BXOInteger(Int64(list.count))
-    }
-
-    public func _def_integer_(args: [BXOObject]) -> BXOObject {
-        return def_type(args: args, type: "Integer")
-    }
-
-    public func _def_float_(args: [BXOObject]) -> BXOObject {
-        return def_type(args: args, type: "Float")
-    }
-
-    public func _def_boolean_(args: [BXOObject]) -> BXOObject {
-        return def_type(args: args, type: "Boolean")
-    }
-
-    public func _def_string_(args: [BXOObject]) -> BXOObject {
-        return def_type(args: args, type: "String")
-    }
-
-    public func _def_symbol_(args: [BXOObject]) -> BXOObject {
-        return def_type(args: args, type: "Symbol")
-    }
-
-    public func _def_list_(args: [BXOObject]) -> BXOObject {
-        return def_type(args: args, type: "List")
-    }
-
-    public func _def_object_(args: [BXOObject]) -> BXOObject {
-        return def_type(args: args, type: "Object")
-    }
-
-    public func def_type(args: [BXOObject], type: String) -> BXOObject {
-        if args.count > 1 {
-            if let symbol = args[0] as? BXOSymbol {
-                args[1].self_object = self
-                if (type_entity_table[type] != nil) {
-                    print("Define new class method \(type) \(args)")
-                    type_entity_table[type]![symbol.symbol] = args[1]
-                }
-            }
-        }
-        return BXOVoid()
     }
 }
 
@@ -1071,11 +1037,11 @@ let list6 = BXOList([
 
 /*
 Append the followinf code to any program:
-(this:def_integer #print [(self:str):print])
+(Integer:type_def #print [(self:str):print])
 */
 let int_print = BXOList([
-    BXOVariable(type: .ThisVar),
-    BXOSelector("def_integer"),
+    BXOInteger(0),
+    BXOSelector("type_def"),
     BXOSymbol("print"),
     BXOList([
         BXOList([
@@ -1086,7 +1052,7 @@ let int_print = BXOList([
     ], true)
 ])
 
-let program = list6
+let program = list1
 program.list.insert(int_print, at: 0)
 
 LOG(program)
