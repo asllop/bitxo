@@ -5,14 +5,18 @@
 
 import Foundation
 
+enum BXOType: String {
+    case integer, float, boolean, string, symbol, list, object
+}
+
 var type_entity_table : [String:[String:BXOObject]] = [
-    "Integer":[:],
-    "Float":[:],
-    "Boolean":[:],
-    "String":[:],
-    "Symbol":[:],
-    "List":[:],
-    "Object":[:],
+    BXOType.integer.rawValue : [:],
+    BXOType.float.rawValue : [:],
+    BXOType.boolean.rawValue : [:],
+    BXOType.string.rawValue : [:],
+    BXOType.symbol.rawValue : [:],
+    BXOType.list.rawValue : [:],
+    BXOType.object.rawValue : [:]
 ]
 
 class BXOObject : CustomStringConvertible {
@@ -42,7 +46,7 @@ class BXOObject : CustomStringConvertible {
     }
 
     public func bxotype() -> String {
-        return "Object"
+        return BXOType.object.rawValue
     }
     
     public func _def_(args: [BXOObject]) -> BXOObject {
@@ -84,9 +88,9 @@ class BXOObject : CustomStringConvertible {
     public func _type_def_(args: [BXOObject]) -> BXOObject {
         if args.count > 1 {
             if let symbol = args[0] as? BXOSymbol {
-                args[1].self_object = self
                 if (type_entity_table[self.bxotype()] != nil) {
                     print("Define new class method \(self.bxotype()) \(args)")
+                    args[1].self_object = self
                     type_entity_table[self.bxotype()]![symbol.symbol] = args[1]
                 }
             }
@@ -116,7 +120,7 @@ class BXOInteger : BXOObject  {
     }
 
     override public func bxotype() -> String {
-        return "Integer"
+        return BXOType.integer.rawValue
     }
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
@@ -204,7 +208,7 @@ class BXOFloat : BXOObject {
     }
 
     override public func bxotype() -> String {
-        return "Float"
+        return BXOType.float.rawValue
     }
 
     public func _plus_(args: [BXOObject]) -> BXOObject {
@@ -286,7 +290,7 @@ class BXOBoolean : BXOObject {
     }
 
     override public func bxotype() -> String {
-        return "Boolean"
+        return BXOType.boolean.rawValue
     }
 
     public func _and_(args: [BXOObject]) -> BXOObject {
@@ -322,7 +326,7 @@ class BXOString : BXOObject {
     }
 
     override public func bxotype() -> String {
-        return "String"
+        return BXOType.string.rawValue
     }
 
     public func _sym_(args: [BXOObject]) -> BXOObject {
@@ -348,7 +352,7 @@ class BXOSymbol : BXOObject {
     }
 
     override public func bxotype() -> String {
-        return "Symbol"
+        return BXOType.symbol.rawValue
     }
 
     public func _str_(args: [BXOObject]) -> BXOObject {
@@ -357,18 +361,6 @@ class BXOSymbol : BXOObject {
 
     public func _sel_(args: [BXOObject]) -> BXOObject {
         return BXOSelector(self.symbol)
-    }
-}
-
-class BXOSelector : BXOObject {
-    public var function : String
-
-    public init(_ function: String) {
-        self.function = function
-    }
-
-    override public func bxotype() -> String {
-        return "Selector"
     }
 }
 
@@ -395,7 +387,7 @@ class BXOList : BXOObject {
     }
 
     override public func bxotype() -> String {
-        return "List"
+        return BXOType.list.rawValue
     }
 
     public func _if_(args: [BXOObject]) -> BXOObject {
@@ -495,6 +487,14 @@ class BXOList : BXOObject {
 
     public func _size_(args: [BXOObject]) -> BXOObject {
         return BXOInteger(Int64(list.count))
+    }
+}
+
+class BXOSelector : BXOObject {
+    public var function : String
+
+    public init(_ function: String) {
+        self.function = function
     }
 }
 
