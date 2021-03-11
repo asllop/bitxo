@@ -1,4 +1,9 @@
-//TODO: create instances, copy of a class/object & memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy.
+//TODO: run a list passed as an argument to a defined method, and pass arguments to it.
+//TODO: create instances, copy of an object
+//TODO: memory management: make sure one instance can't be in 2 places, when passing an object, always make a copy
+//      -> make "def" (and "type_dev") clone the object passed to it.
+//TODO: "include" external code. Just generate the BXOList and insert the contents into the main program BXOList.
+//TODO: string primitives: size, set, at, put, add, rem
 //TODO: Implement parse method, takes code and generates a BXOList (the tree representation)
 //TODO: Exceptions
 //TODO: interface with host app
@@ -320,9 +325,10 @@ class BXOString : BXOObject {
         super.init()
 
         // Init native functions
-        //TODO: string primitives: size, =, +, set, at, put, add, rem
         self.native_functions["sym"] = self._sym_
         self.native_functions["print"] = self._print_
+        self.native_functions["="] = self._equal_
+        self.native_functions["+"] = self._plus_
     }
 
     override public func bxotype() -> String {
@@ -335,6 +341,20 @@ class BXOString : BXOObject {
 
     public func _print_(args: [BXOObject]) -> BXOObject {
         print("\(self.string)")
+        return BXOVoid()
+    }
+
+    public func _equal_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let str = args[0] as? BXOString {
+            return BXOBoolean(self.string == str.string)
+        }
+        return BXOVoid()
+    }
+
+    public func _plus_(args: [BXOObject]) -> BXOObject {
+        if args.count > 0, let str = args[0] as? BXOString {
+            return BXOString(self.string + str.string)
+        }
         return BXOVoid()
     }
 }
@@ -825,7 +845,7 @@ let list2 = BXOList([
     (num:print)
     (('Hola'):print)
     ('Adeu':print)
-    (num:def #suma [self:+ (args:at 0)])
+    (Integer:type_def #suma [self:+ (args:at 0)])
     ((num:suma 10):print)
 */
 
@@ -879,8 +899,8 @@ let list3 = BXOList([
         BXOSelector("print")
     ]),
     BXOList([
-        BXOVariable("num"),
-        BXOSelector("def"),
+        BXOInteger(0),
+        BXOSelector("type_def"),
         BXOSymbol("suma"),
         BXOList([
             BXOVariable(type: .SelfVar),
@@ -1021,6 +1041,8 @@ let list5 = BXOList([
 /*
     (this:def #num 101)
     (num:print)
+    (num:inc)
+    (num:print)
 */
 let list6 = BXOList([
     BXOList([
@@ -1032,11 +1054,63 @@ let list6 = BXOList([
     BXOList([
         BXOVariable("num"),
         BXOSelector("print")
+    ]),
+    BXOList([
+        BXOVariable("num"),
+        BXOSelector("inc")
+    ]),
+    BXOList([
+        BXOVariable("num"),
+        BXOSelector("print")
     ])
 ])
 
 /*
-Append the followinf code to any program:
+    (this:def #name 'Andreu')
+    (this:def #surname 'Santaren-Llop')
+    ((((name:+ ' '):+ surname)):print)
+    ([name:= 'Andreu']:if ['Hola Andreu!':print])
+*/
+let list7 = BXOList([
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("name"),
+        BXOString("Andreu")
+    ]),
+    BXOList([
+        BXOVariable(type: .ThisVar),
+        BXOSelector("def"),
+        BXOSymbol("surname"),
+        BXOString("Santaren-Llop")
+    ]),
+    BXOList([
+        BXOList([
+            BXOList([
+                BXOVariable("name"),
+                BXOSelector("+"),
+                BXOString(" ")
+            ]),
+            BXOSelector("+"),
+            BXOVariable("surname"),
+        ]),
+        BXOSelector("print")
+    ]),
+    BXOList([
+        BXOList([
+            BXOVariable("name"),
+            BXOSelector("="),
+            BXOString("Andreu")
+        ], true),
+        BXOSelector("if"),
+        BXOList([
+            BXOString("Hola Andreu!"),
+            BXOSelector("print")
+        ], true)
+    ])
+])
+
+/*
 (Integer:type_def #print [(self:str):print])
 */
 let int_print = BXOList([
@@ -1052,8 +1126,47 @@ let int_print = BXOList([
     ], true)
 ])
 
-let program = list1
+/*
+(Integer:type_def #inc [(self:set (self:+ 1))])
+*/
+let int_inc = BXOList([
+    BXOInteger(0),
+    BXOSelector("type_def"),
+    BXOSymbol("inc"),
+    BXOList([
+        BXOList([
+            BXOVariable(type: .SelfVar),
+            BXOSelector("set"),
+            BXOList([
+                BXOVariable(type: .SelfVar),
+                BXOSelector("+"),
+                BXOInteger(1)
+            ])
+        ])
+    ], true)
+])
+
+/*
+(List:type_def #each [
+    (this:def #l_index 0)
+    ([l_index:< (self:size)]:while [
+        "TODO: how to eval a list passed as argument? and pass an argument to it?"
+        "(args:at 0)"
+        "(self:at l_index)"
+
+        (l_index:inc)
+    ])
+])
+*/
+let list_each = BXOList([
+])
+
+let program = list7
+
+// Append essentials
 program.list.insert(int_print, at: 0)
+program.list.insert(int_inc, at: 0)
+//program.list.insert(list_each, at: 0)
 
 LOG(program)
 print("-----------------------------")
